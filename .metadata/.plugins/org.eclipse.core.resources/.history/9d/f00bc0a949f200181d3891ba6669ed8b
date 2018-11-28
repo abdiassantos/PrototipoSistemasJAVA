@@ -1,0 +1,59 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui">
+<ui:composition template="/jsf/Template/templatePrincipal.xhtml">
+	<ui:define name="corpo">
+		<div class="content">
+			<div id="painel" class="container">
+			    <div class="container-fluid">
+				    <div class="row-fluid">
+				    	<div class="well acesso">
+					    	<h:form prependId="false">
+				    			
+				    			<span class="user pull-left">
+					    			<span class="glyphicon glyphicon-briefcase">
+					    				<h:outputText	rendered="#{not sessaoUsuarioMB.ehFuneraria}" value=" #{sessaoUsuarioMB.usuarioLogado.orgao.sigla}" />
+					    				<h:outputText rendered="#{sessaoUsuarioMB.ehFuneraria}"	value=" #{sessaoUsuarioMB.funeraria.nome}" />
+					    			</span>
+					    		</span>
+					    		
+					    		<span class="user pull-right">
+					    			<span class="glyphicon glyphicon-user"></span>
+					    			<h:outputText rendered="#{sessaoUsuarioMB.possuiGrupo}"
+										value=" #{sessaoUsuarioMB.usuarioLogado.nomePessoa} - #{sessaoUsuarioMB.usuarioLogado.perfil.descricao}  - GRUPO: #{sessaoUsuarioMB.usuarioLogado.grupo.descricao}" />
+										
+					    			<h:outputText rendered="#{not sessaoUsuarioMB.possuiGrupo}"
+										value=" #{sessaoUsuarioMB.usuarioLogado.nomePessoa} - #{sessaoUsuarioMB.usuarioLogado.perfil.descricao}" />
+					    		</span>
+					    		<div class="clearfix"></div>
+							</h:form>
+					    </div>
+				    </div>
+				    <div class="row-fluid">
+				    	<div class="span12">
+				    		<ui:insert name="menu">
+								<ui:include src="menu.xhtml" />
+							</ui:insert>
+						</div>
+				    </div>
+				    <div class="row-fluid">
+					    <div class="span3">
+					    	<ui:insert name="sidebar">
+					
+							</ui:insert>
+					    </div>
+					    <div class="span9">
+				    		<ui:insert name="conteudo">
+				    		
+				    		</ui:insert>
+					    </div>
+				    </div>
+				</div>
+			</div>
+		</div>
+	</ui:define>
+</ui:composition>
+</html>

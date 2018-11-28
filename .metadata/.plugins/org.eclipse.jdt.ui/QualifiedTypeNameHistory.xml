@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<qualifiedTypeNameHistroy>
+<fullyQualifiedTypeName name="org.primefaces.model.LazyDataModel"/>
+<fullyQualifiedTypeName name="javax.annotation.PostConstruct"/>
+<fullyQualifiedTypeName name="org.hibernate.envers.query.criteria.internal.RevisionTypeAuditExpression"/>
+<fullyQualifiedTypeName name="br.gov.pi.teresina.semf.jsf.util.LazyDataModelGenerica"/>
+<fullyQualifiedTypeName name="br.gov.pi.teresina.semf.enums.Sexo"/>
+<fullyQualifiedTypeName name="br.gov.pi.teresina.semf.mensagem.GerarMensagem"/>
+<fullyQualifiedTypeName name="br.gov.pi.teresina.semf.modelo.Pessoa"/>
+</qualifiedTypeNameHistroy>

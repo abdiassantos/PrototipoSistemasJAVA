@@ -1,0 +1,36 @@
+package br.gov.pi.teresina.semf.base;
+
+
+
+import java.lang.reflect.ParameterizedType;
+
+import org.hibernate.Session;
+import org.hibernate.ejb.HibernateEntityManager;
+
+public abstract class OrgaoJPABaseDAO<T> extends BaseDAOImpl<T> {
+
+	public Session getSession() {
+		HibernateEntityManager em = (HibernateEntityManager) entityManager
+				.getDelegate();
+		Session sessao = em.getSession();
+		return sessao;
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public OrgaoJPABaseDAO() {
+		Object object = ((ParameterizedType) getClass().getGenericSuperclass())
+				.getActualTypeArguments()[0];
+		if (object instanceof Class<?>) {
+			classe = (Class<T>) ((ParameterizedType) getClass()
+					.getGenericSuperclass()).getActualTypeArguments()[0];
+		} else {
+			if (object instanceof Class) {
+				classe = (Class) ((ParameterizedType) getClass()
+						.getGenericSuperclass()).getActualTypeArguments()[0];
+			}
+		}
+	}
+
+}
+
+

@@ -1,0 +1,60 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions">
+<ui:composition template="/jsf/Template/templateCadastro.xhtml">
+	<f:metadata>
+		<f:viewParam name="codigo" value="#{pessoaFisicaMB.codigo}"
+			converterMessage="Valor deve ser um número" />
+		<f:event listener="#{pessoaFisicaMB.editar}" type="preRenderView" />
+		<f:event listener="#{pessoaFisicaMB.setDefaultValues}"
+			type="preRenderView" />
+	</f:metadata>
+	<ui:param name="menu_pai" value="cadastro" />
+	<ui:param name="menu_filho" value="cadastrarRedeSocial" />
+	<ui:define name="sidebar">
+		<ui:include src="menuRedeSocial.xhtml" />
+	</ui:define>
+	<ui:define name="conteudo">
+		<div class="well corpo">
+			<div class="orgao pull-right">
+				<div class="msg-obrigatorio">
+					<div class="ui-messages-info ui-corner-all">
+						<span class="ui-messages-info-icon"></span> <span
+							class="ui-messages-info-summary">* Campos obrigatórios</span>
+					</div>
+				</div>
+			</div>
+			<h2>
+				<i class="glyphicon glyphicon-tasks"></i>Cadastro de Rede Social
+			</h2>
+			<p:spacer height="10" />
+			<h:form id="formCadastroPessoaFisica" class="formCadastro"
+				prependId="false">
+				<p:messages showDetail="false" showSummary="true" id="mensagem" />
+				<h:panelGrid columns="2" columnClasses="r20, l80">
+					<h:outputLabel value="* Descrição" />
+					<p:inputText value="#{RedesSociaisMB.redesSociais.descricao}" size="40"
+						styleClass="span12" required="true"/>
+				</h:panelGrid>
+
+				<p:spacer height="20" />
+				<div align="center" class="div-botoes-inferior">
+					<p:commandButton value="Salvar" process="@form"
+						icon="ui-icon-check" action="#{pessoaFisicaMB.salvar}"
+						update="@form" />
+					<p:commandButton value="Novo Cadastro" type="button"
+						icon="ui-icon-plus"
+						onclick="javascript:window.location.href='cadastrarRedeSocial.jsf'" />
+				</div>
+				<div class="span3 text-right"></div>
+				<p:spacer height="10" />
+			</h:form>					
+
+		</div>
+	</ui:define>
+</ui:composition>
+</html>

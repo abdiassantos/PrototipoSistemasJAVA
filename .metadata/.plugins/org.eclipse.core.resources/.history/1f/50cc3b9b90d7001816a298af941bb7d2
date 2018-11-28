@@ -1,0 +1,1604 @@
+package br.gov.pi.teresina.semf.base;
+
+import static net.sf.trugger.element.Elements.element;
+import static net.sf.trugger.reflection.ReflectionPredicates.annotatedWith;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.persistence.EntityManager;
+import javax.persistence.Id;
+import javax.persistence.NoResultException;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.persistence.Transient;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+
+import net.sf.trugger.element.Element;
+import net.sf.trugger.selector.ElementSelector;
+
+import org.hibernate.Hibernate;
+import org.hibernate.envers.AuditReader;
+import org.hibernate.envers.AuditReaderFactory;
+import org.hibernate.envers.RevisionType;
+import org.hibernate.envers.query.AuditEntity;
+import org.hibernate.envers.query.AuditQuery;
+import org.hibernate.proxy.HibernateProxy;
+
+import br.gov.pi.teresina.semf.auditoria.ClasseAuditada;
+import br.gov.pi.teresina.semf.auditoria.RevInfo;
+import br.gov.pi.teresina.semf.constantes.Constantes;
+import br.gov.pi.teresina.semf.dao.util.ArgumentoVO;
+import br.gov.pi.teresina.semf.dao.util.CondicaoSQL;
+
+public abstract class BaseDAOImpl<T> implements BaseDAO<T> {
+
+	protected Class<T> classe;
+
+	@PersistenceContext(unitName = Constantes.EM_ORGAO)
+	public EntityManager entityManager;
+
+	/*public EntityManagerFactory entityManagerFactory;
+
+	public EntityManagerFactory getEntityManagerFactory() {
+		return entityManagerFactory;
+	}
+
+	public void setEntityManagerFactory(
+			EntityManagerFactory entityManagerFactory) {
+		this.entityManagerFactory = entityManagerFactory;
+	}*/
+
+	public EntityManager getEntityManager() {
+		return entityManager;
+	}
+
+	public void setEntityManager(EntityManager entityManager) {
+		this.entityManager = entityManager;
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public BaseDAOImpl() {
+		Object object = ((ParameterizedType) getClass().getGenericSuperclass())
+				.getActualTypeArguments()[0];
+		if (object instanceof Class<?>) {
+			classe = (Class<T>) ((ParameterizedType) getClass()
+					.getGenericSuperclass()).getActualTypeArguments()[0];
+		} else {
+			if (object instanceof Class) {
+				classe = (Class) ((ParameterizedType) getClass()
+						.getGenericSuperclass()).getActualTypeArguments()[0];
+			}
+		}
+
+	}
+
+	@Override
+	public T salvar(T objeto) {
+		getEntityManager().joinTransaction();
+		objeto = getEntityManager().merge(objeto);
+		getEntityManager().flush();
+		getEntityManager().clear();
+		return objeto;
+	}
+
+	@Override
+	public void alterar(T objeto) {
+		salvar(objeto);
+	}
+
+	@Override
+	public T mergeSemServico(T objeto) {
+		return getEntityManager().merge(objeto);
+	}
+
+	@Override
+	public T merge(T objeto) {
+		return salvar(objeto);
+	}
+
+	@Override
+	public void deletar(T objeto) {
+		if (!getEntityManager().contains(objeto))
+			objeto = getEntityManager().merge(objeto);
+		getEntityManager().remove(objeto);
+		// gerarServico(objeto, TipoServico.EXCLUSAO);
+	}
+
+	@Override
+	public void deletarSemServico(T objeto) {
+		getEntityManager().remove(objeto);
+	}
+
+	/**
+	 * Testa se um objeto possui o método getId().
+	 * 
+	 * @author Jonny
+	 * @param argumentos
+	 * @return void
+	 * @throws InvocationTargetException
+	 * @throws IllegalAccessException
+	 * @throws IllegalArgumentException
+	 * @throws SecurityException
+	 */
+
+	@Override
+	public boolean hasPrimaryKey(T objeto) throws SecurityException,
+			IllegalArgumentException, IllegalAccessException,
+			InvocationTargetException {
+
+		ElementSelector seletorId = element().thatMatches(
+				annotatedWith(Id.class));
+		Element elementId = null;
+		if (seletorId != null && objeto != null) {
+			elementId = seletorId.in(objeto);
+			if (elementId != null)
+				return true;
+		}
+		return false;
+	}
+
+	@Override
+	public String primaryKey(T objeto) {
+		ElementSelector seletorId = element().thatMatches(
+				annotatedWith(Id.class));
+		Element elementId = null;
+		if (seletorId != null && objeto != null) {
+			elementId = seletorId.in(objeto);
+			if (elementId != null)
+				return elementId.name();
+		}
+		return null;
+	}
+
+	/**
+	 * Verifica se o objeto passado, possui uma chave primária, se tiver se o
+	 * atributo com esse annotation é nulo.
+	 * 
+	 * @author Jonny
+	 * @param objeto
+	 * @return boolean
+	 * @throws NoSuchMethodException
+	 * @throws SecurityException
+	 * @throws InvocationTargetException
+	 * @throws IllegalAccessException
+	 * @throws IllegalArgumentException
+	 */
+
+	public boolean idIsNull(T objeto) {
+		if (valueID(objeto) == null) {
+			return true;
+		}
+		return false;
+	}
+
+	@Override
+	public Long valueID(Object objeto) {
+
+		Long id = null;
+		ElementSelector seletorId = element().thatMatches(
+				annotatedWith(Id.class));
+		Element elementId = null;
+		if (seletorId != null && objeto != null) {
+			elementId = seletorId.in(objeto);
+		}
+
+		if (objeto != null && seletorId != null && elementId != null
+				&& elementId.value() != null) {
+			id = elementId.value();
+		}
+		return id;
+	}
+
+	/**
+	 * Captura e retorna,se existir, todos os métodos get de todos os atributos
+	 * do objeto especificado.
+	 * 
+	 * @author Jonny
+	 * @param argumentos
+	 * @return java.util.ArrayList;
+	 */
+	public ArrayList<Method> capturarMetodosGet(T objeto) {
+		Method metodos[] = objeto.getClass().getDeclaredMethods();
+		ArrayList<Method> metodosGet = new ArrayList<Method>();
+		Field campos[] = objeto.getClass().getDeclaredFields();
+		Method.setAccessible(metodos, true);
+		Field.setAccessible(campos, true);
+		for (int i = 0; i < campos.length; i++) {
+			boolean possuiCampoTransientOuPK = false;
+			if (campos[i].getName().equals("serialVersionUID"))
+				continue;
+			Annotation annotationsNoCampo[] = campos[i]
+					.getDeclaredAnnotations();
+			for (Annotation an : annotationsNoCampo) {
+				if (an instanceof Transient || an instanceof Id) {
+					possuiCampoTransientOuPK = true;
+					break;
+				}
+			}
+			if (possuiCampoTransientOuPK == true)
+				continue;
+			for (int j = 0; j < metodos.length; j++) {
+				boolean possuiMetodoTrasientOuPK = false;
+				Annotation annotationsNoMetodo[] = metodos[j]
+						.getDeclaredAnnotations();
+				for (Annotation an : annotationsNoMetodo) {
+					if (an instanceof Transient || an instanceof Id) {
+						possuiMetodoTrasientOuPK = true;
+						break;
+					}
+				}
+				if (possuiMetodoTrasientOuPK == true) {
+					continue;
+				}
+				if (metodos[j].getName().equals(
+						"get"
+								+ campos[i].getName().substring(0, 1)
+										.toUpperCase()
+								+ campos[i].getName().substring(1))
+						|| metodos[j].getName().equals(
+								"is"
+										+ campos[i].getName().substring(0, 1)
+												.toUpperCase()
+										+ campos[i].getName().substring(1))) {
+					metodosGet.add(metodos[j]);
+				}
+			}
+
+		}
+		return metodosGet;
+	}
+
+	// public abstract void gerarServico(T objeto, TipoServico tipoServico);
+
+	@Override
+	public T recuperarPorId(Long id) {
+		return (T) getEntityManager().find(classe, id);
+	}
+	
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public T recuperarPorIdDetached(Long id) {
+		return (T) getEntityManager().find(classe, id);
+	}
+
+	@SuppressWarnings({ "unchecked" })
+	@Override
+	public List<T> recuperarTodos(String ordenacao, String ordem) {
+		StringBuilder cq = new StringBuilder();
+		if (ordenacao != null && !ordenacao.trim().isEmpty() && ordem != null
+				&& !ordem.trim().isEmpty())
+			cq.append("from " + classe.getName() + " order by " + ordenacao
+					+ " " + ordem);
+
+		return getEntityManager().createQuery(cq.toString()).getResultList();
+	}
+
+	/**
+	 * Novo padrão para montarQueryPorCampo. responsável por montar query
+	 * genérica. a principal diferença é que este metodo recebe um
+	 * List<ArgumentoVO>{@link ArgumentoVO}
+	 * 
+	 * @author Welson
+	 * @param List
+	 *            <ArgumentoVO> argumentos
+	 * @return javax.persistence.Query
+	 */
+	public Query montarQueryPorCampos(List<ArgumentoVO> argumentos) {
+		StringBuffer queryString = new StringBuffer();
+		StringBuffer queryStringOrdenacao = new StringBuffer();
+		StringBuffer queryStringAgrupamento = new StringBuffer();
+		queryString.append(" from " + classe.getName() + " where ");
+
+		// montando string da query que fica após o "where" (ex: nome = ?1 and
+		// datanascimento = ?2
+		int i = 1;
+		int j = 1;
+		int l = 1;
+		for (ArgumentoVO argumentoVO : argumentos) {
+
+			// caso a condicao for like a concatenacao e de forma diferente.
+			if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.LIKE.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.NOT_LIKE.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				queryString.append(" UPPER(cast(" + argumentoVO.getAtributo()
+						+ " as string)) "
+						+ argumentoVO.getCondicaoSQL().getDescricao()
+						+ " UPPER(?" + i + ")");
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IN.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao() + " (?"
+						+ i + ")");
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IS_NULL.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.IS_NOT_NULL.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+				// seta os valores juntamente com o tipo de comparacao is null,
+				// not null...
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao());
+			} else {
+
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				// seta os valores juntamente com o tipo de comparacao =,>,<,
+				// not null...
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao() + " ?"
+						+ i);
+			}
+
+			// criando a string de ordenação
+			if (argumentoVO.isOrdenar()) {
+				if (j <= 1) {
+					queryStringOrdenacao.append(argumentoVO.getAtributo());
+				} else {
+					queryStringOrdenacao.append(" , "
+							+ argumentoVO.getAtributo());
+				}
+				j++;
+			}
+
+			// criando a string de agrupamento
+			if (argumentoVO.isAgrupar()) {
+				if (l <= 1) {
+					queryStringAgrupamento.append(argumentoVO.getAtributo());
+				} else {
+					queryStringAgrupamento.append(" , "
+							+ argumentoVO.getAtributo());
+				}
+				l++;
+			}
+
+			i++;
+		}
+
+		if (!queryStringAgrupamento.toString().equals(""))
+			queryString
+					.append(" group by " + queryStringAgrupamento.toString());
+
+		if (!queryStringOrdenacao.toString().equals(""))
+			queryString.append(" order by " + queryStringOrdenacao.toString());
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+		System.out.println(queryString.toString());
+		// setando o valor das determinadas posições dos parametros
+		i = 1;
+		for (ArgumentoVO argumentoVO : argumentos) {
+
+			if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.LIKE.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.NOT_LIKE.getDescricao())) {
+
+				query.setParameter(i, "%" + argumentoVO.getValor() + "%");
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IS_NULL.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.IS_NOT_NULL.getDescricao())) {
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IN.getDescricao())) {
+				query.setParameter(i, argumentoVO.getValor());
+			} else {
+
+				query.setParameter(i, argumentoVO.getValor());
+
+			}
+			i++;
+		}
+
+		System.out.println(query.toString());
+		return query;
+	}
+
+	/**
+	 * Método criado para possibilitar ordenar query por mais de um campo Este
+	 * método recebe além de um List<ArgumentoVO>{@link ArgumentoVO},
+	 * List<String> camposOrdenacao: recebe a descrição dos campos que vão ser
+	 * ordenados String tipoOrdenacao: recebe o tipo de ordenação [ASC, DESC]
+	 * 
+	 * @author Layenis Gonçalves
+	 * @param List
+	 *            <ArgumentoVO> argumentos
+	 * @param List
+	 *            <String> camposOrdenacao
+	 * @param String
+	 *            tipoOrdenacao
+	 * @return javax.persistence.Query
+	 */
+	public Query montarQueryPorCampos(List<ArgumentoVO> argumentos,
+			List<String> camposOrdenacao, String tipoOrdenacao) {
+		StringBuffer queryString = new StringBuffer();
+		StringBuffer queryStringOrdenacao = null;
+		StringBuffer queryStringAgrupamento = new StringBuffer();
+		queryString.append(" from " + classe.getName() + " where ");
+
+		// montando string da query que fica após o "where" (ex: nome = ?1 and
+		// datanascimento = ?2
+		int i = 1;
+		for (ArgumentoVO argumentoVO : argumentos) {
+
+			// caso a condicao for like a concatenacao e de forma diferente.
+			if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.LIKE.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.NOT_LIKE.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				queryString.append(" UPPER(cast(" + argumentoVO.getAtributo()
+						+ " as string)) "
+						+ argumentoVO.getCondicaoSQL().getDescricao()
+						+ " UPPER(?" + i + ")");
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IN.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao() + " (?"
+						+ i + ")");
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IS_NULL.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.IS_NOT_NULL.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+				// seta os valores juntamente com o tipo de comparacao is null,
+				// not null...
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao());
+			} else {
+
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				// seta os valores juntamente com o tipo de comparacao =,>,<,
+				// not null...
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao() + " ?"
+						+ i);
+			}
+
+			i++;
+		}
+
+		for (String campo : camposOrdenacao) {
+			if (queryStringOrdenacao == null) {
+				queryStringOrdenacao = new StringBuffer();
+				queryStringOrdenacao.append(campo);
+			} else {
+				queryStringOrdenacao.append(" , " + campo);
+			}
+		}
+
+		if (!queryStringOrdenacao.toString().equals(""))
+			queryString.append(" order by " + queryStringOrdenacao.toString()
+					+ " " + tipoOrdenacao);
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+		// setando o valor das determinadas posições dos parametros
+		i = 1;
+		for (ArgumentoVO argumentoVO : argumentos) {
+
+			if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.LIKE.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.NOT_LIKE.getDescricao())) {
+
+				query.setParameter(i, "%" + argumentoVO.getValor() + "%");
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IS_NULL.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.IS_NOT_NULL.getDescricao())) {
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IN.getDescricao())) {
+				query.setParameter(i, argumentoVO.getValor());
+			} else {
+
+				query.setParameter(i, argumentoVO.getValor());
+
+			}
+			i++;
+		}
+
+		System.out.println(query.toString());
+		return query;
+	}
+
+	/**
+	 * Novo padrão para montarQueryPorCampo. responsável por montar query
+	 * genérica. a principal diferença é que este metodo recebe um
+	 * List<ArgumentoVO>{@link ArgumentoVO} e um campo especifico para ser
+	 * agrupado
+	 * 
+	 * @author Welson
+	 * @param List
+	 *            <ArgumentoVO> argumentos
+	 * @return javax.persistence.Query
+	 */
+	public Query montarQueryPorCampos(List<ArgumentoVO> argumentos,
+			String ordenacao, String ordem) {
+		StringBuffer queryString = new StringBuffer();
+		queryString.append(" from " + classe.getName() + " where ");
+
+		// montando string da query que fica após o "where" (ex: nome = ?1 and
+		// datanascimento = ?2
+		int i = 1;
+		int j = 1;
+		int l = 1;
+		for (ArgumentoVO argumentoVO : argumentos) {
+
+			// caso a condicao for like a concatenacao e de forma diferente.
+			if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.LIKE.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.NOT_LIKE.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				queryString.append(" UPPER(cast(" + argumentoVO.getAtributo()
+						+ " as string)) "
+						+ argumentoVO.getCondicaoSQL().getDescricao()
+						+ " UPPER(?" + i + ")");
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IN.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao() + " (?"
+						+ i + ")");
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IS_NULL.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.IS_NOT_NULL.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+				// seta os valores juntamente com o tipo de comparacao is null,
+				// not null...
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao());
+			} else {
+
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				// seta os valores juntamente com o tipo de comparacao =,>,<,
+				// not null...
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao() + " ?"
+						+ i);
+			}
+
+			i++;
+		}
+
+		if (ordenacao != null && !ordenacao.trim().isEmpty() && ordem != null
+				&& !ordem.trim().isEmpty()) {
+			queryString.append(" order by " + ordenacao + " " + ordem);
+		}
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+
+		// setando o valor das determinadas posições dos parametros
+		i = 1;
+		for (ArgumentoVO argumentoVO : argumentos) {
+
+			if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.LIKE.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.NOT_LIKE.getDescricao())) {
+
+				query.setParameter(i, "%" + argumentoVO.getValor() + "%");
+				// query.setParameter(i, argumentoVO.getValor() + "%");
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IS_NULL.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.IS_NOT_NULL.getDescricao())) {
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IN.getDescricao())) {
+				query.setParameter(i, argumentoVO.getValor().toString()
+						.replace("[", "").replace("]", ""));
+			} else {
+
+				query.setParameter(i, argumentoVO.getValor());
+
+			}
+			i++;
+		}
+
+		return query;
+	}
+
+	/**
+	 * Método responsável por montar query genérica quando as restrições são
+	 * campos igualados
+	 * 
+	 * @param Map
+	 *            <String, Object> argumentos
+	 * @param String
+	 *            ordenacao
+	 * @param String
+	 *            ordem
+	 * @return javax.persistence.Query
+	 */
+	public Query montarQueryPorCampos(Map<String, Object> argumentos,
+			String ordenacao, String ordem) {
+		StringBuffer queryString = new StringBuffer();
+		queryString.append(" from " + classe.getName() + " where ");
+
+		// montando string da query que fica após o "where" (ex: nome = ?1 and
+		// datanascimento = ?2
+		int i = 1;
+		for (Entry<String, Object> e : argumentos.entrySet()) {
+			if (i > 1) {
+				queryString.append(" and ");
+			}
+			queryString.append(e.getKey() + " = ?" + i);
+			i++;
+		}
+
+		if (ordenacao != null && !ordenacao.trim().isEmpty() && ordem != null
+				&& !ordem.trim().isEmpty()) {
+			queryString.append(" order by " + ordenacao + " " + ordem);
+		}
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+
+		// setando o valor das determinadas posições dos parametros
+		i = 1;
+		for (Entry<String, Object> e : argumentos.entrySet()) {
+			query.setParameter(i, e.getValue());
+			i++;
+		}
+
+		return query;
+	}
+
+	/**
+	 * Metodo usando alterior mente mas que agora esta obsoleto, vai permanecer
+	 * apenas para fins de conhecimento
+	 * 
+	 * @param argumentos
+	 * @return
+	 */
+	@Deprecated
+	public T recuperarPorCriteria(Map<String, Object> argumentos) {
+
+		CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+		CriteriaQuery<T> cq = cb.createQuery(classe);
+		Root<T> root = cq.from(classe);
+
+		List<Predicate> predicates = new ArrayList<Predicate>();
+		// Acionando as Restrições na query
+		for (Entry<String, Object> e : argumentos.entrySet()) {
+			predicates.add(cb.equal(root.get(e.getKey()), e.getValue()));
+		}
+		cq.where(predicates.toArray(new Predicate[] {}));
+		TypedQuery<T> q = getEntityManager().createQuery(cq);
+
+		// O método getSingleResult() lança uma exceção se o resultado for
+		// nulo
+		try {
+			return q.getSingleResult();
+		} catch (NoResultException ex) {
+			return null;
+		}
+
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public T recuperarPorCampos(Map<String, Object> argumentos) {
+
+		Query query = montarQueryPorCampos(argumentos, null, null);
+
+		try {
+			List<T> resultado = query.getResultList();
+			if (!resultado.isEmpty()) {
+
+				T bean = (T) resultado.get(0);
+				return bean;
+
+			} else
+				return null;
+
+		} catch (NoResultException ex) {
+			return null;
+		}
+	}
+
+	/**
+	 * Método responsável por recuperar lista com restrições onde os campos são
+	 * igualados, bem como orderna-los
+	 * 
+	 * @param Map
+	 *            <String, Object> argumentos
+	 * @param String
+	 *            ordenacao
+	 * @param String
+	 *            ordem
+	 * @return javax.persistence.Query
+	 * 
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarListaPorCampos(Map<String, Object> argumentos,
+			String ordenacao, String ordem) {
+
+		Query query = montarQueryPorCampos(argumentos, ordenacao, ordem);
+
+		return query.getResultList();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarListaPorCampos(List<ArgumentoVO> argumentos) {
+
+		Query query = montarQueryPorCampos(argumentos);
+
+		return query.getResultList();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarListaPorCampos(List<ArgumentoVO> argumentos,
+			String ordenacao, String order) {
+
+		Query query = montarQueryPorCampos(argumentos, ordenacao, order);
+
+		return query.getResultList();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public T recuperarPorCampos(List<ArgumentoVO> argumentos, String ordenacao,
+			String order) {
+
+		Query query = montarQueryPorCampos(argumentos, ordenacao, order);
+
+		try {
+			List<T> resultado = query.getResultList();
+			if (!resultado.isEmpty()) {
+
+				T bean = (T) resultado.get(0);
+				return bean;
+			}
+		} catch (NoResultException ex) {
+			return null;
+		}
+
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public T recuperarPorCampos(ArgumentoVO argumento, String ordenacao,
+			String order) {
+		List<ArgumentoVO> argumentos = new ArrayList();
+		argumentos.add(argumento);
+
+		Query query = montarQueryPorCampos(argumentos, ordenacao, order);
+
+		try {
+			List<T> resultado = query.getResultList();
+			if (!resultado.isEmpty()) {
+
+				T bean = (T) resultado.get(0);
+				return bean;
+			}
+		} catch (NoResultException ex) {
+			return null;
+		}
+
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarListaPorCampos(ArgumentoVO argumento) {
+		List<ArgumentoVO> argumentos = new ArrayList<ArgumentoVO>();
+		argumentos.add(argumento);
+		Query query = montarQueryPorCampos(argumentos);
+
+		try {
+			List<T> resultado = query.getResultList();
+			if (!resultado.isEmpty()) {
+
+				return resultado;
+
+			} else
+				return null;
+
+		} catch (NoResultException ex) {
+			return null;
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public T recuperarPorCampos(ArgumentoVO argumento) {
+		List<ArgumentoVO> argumentos = new ArrayList<ArgumentoVO>();
+		argumentos.add(argumento);
+		Query query = montarQueryPorCampos(argumentos);
+
+		try {
+			List<T> resultado = query.getResultList();
+			if (!resultado.isEmpty()) {
+
+				T bean = (T) resultado.get(0);
+				return bean;
+
+			} else
+				return null;
+
+		} catch (NoResultException ex) {
+			return null;
+		}
+	}
+
+	@Override
+	public T recuperarPorCampos(ArgumentoVO argumento,
+			List<String> camposOrdenacao, String tipoOrdenacao) {
+		List<ArgumentoVO> argumentos = new ArrayList<ArgumentoVO>();
+		argumentos.add(argumento);
+		Query query = montarQueryPorCampos(argumentos);
+
+		try {
+			List<T> resultado = query.getResultList();
+			if (!resultado.isEmpty()) {
+
+				T bean = (T) resultado.get(0);
+				return bean;
+
+			} else
+				return null;
+
+		} catch (NoResultException ex) {
+			return null;
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public T recuperarPorCampos(List<ArgumentoVO> argumentos) {
+		Query query = montarQueryPorCampos(argumentos);
+
+		try {
+			List<T> resultado = query.getResultList();
+			if (!resultado.isEmpty()) {
+
+				T bean = (T) resultado.get(0);
+				return bean;
+
+			} else
+				return null;
+
+		} catch (NoResultException ex) {
+			return null;
+		}
+	}
+
+	@Override
+	public Long recuperarTotalRegistros() {
+
+		return (Long) getEntityManager().createQuery(
+				"select count(*) from " + classe.getName()).getSingleResult();
+	}
+
+	@Override
+	public Long recuperarTotalRegistrosPorCamposLike(
+			Map<String, String> argumentos) {
+
+		StringBuffer queryString = new StringBuffer();
+		queryString.append("select count(*) from " + classe.getName()
+				+ " where ");
+
+		int i = 1;
+		for (Entry<String, String> e : argumentos.entrySet()) {
+			if (i > 1) {
+				queryString.append(" and ");
+			}
+			queryString.append(" UPPER(cast(" + e.getKey()
+					+ " as string)) like UPPER(?" + i + ")");
+			i++;
+		}
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+
+		i = 1;
+		for (Entry<String, String> e : argumentos.entrySet()) {
+			query.setParameter(i, "%" + e.getValue().toString() + "%");
+			i++;
+		}
+
+		return (Long) query.getSingleResult();
+	}
+
+	@Override
+	public Long recuperarTotalRegistrosComRestricoes(
+			Map<String, Object> restricoes) {
+
+		StringBuffer queryString = new StringBuffer();
+		queryString.append("select count(*) from " + classe.getName()
+				+ " where ");
+
+		int i = 1;
+		for (Entry<String, Object> e : restricoes.entrySet()) {
+			if (i > 1) {
+				queryString.append(" and ");
+			}
+			queryString.append(e.getKey() + " = ?" + i);
+			i++;
+		}
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+
+		i = 1;
+		for (Entry<String, Object> e : restricoes.entrySet()) {
+			query.setParameter(i, e.getValue());
+			i++;
+		}
+
+		return (Long) query.getSingleResult();
+	}
+
+	@Override
+	public Long recuperarTotalRegistrosPorCamposArgumentoVO(
+			List<ArgumentoVO> args) {
+		StringBuffer queryString = new StringBuffer();
+		queryString.append("select count(*) from " + classe.getName()
+				+ " where ");
+
+		// montando string da query que fica após o "where" (ex: nome = ?1 and
+		// datanascimento = ?2
+		int i = 1;
+
+		for (ArgumentoVO argumentoVO : args) {
+
+			// caso a condicao for like a concatenacao e de forma diferente.
+			if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.LIKE.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.NOT_LIKE.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				queryString.append(" UPPER(cast(" + argumentoVO.getAtributo()
+						+ " as string)) "
+						+ argumentoVO.getCondicaoSQL().getDescricao()
+						+ " UPPER(?" + i + ")");
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IN.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao() + " (?"
+						+ i + ")");
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IS_NULL.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.IS_NOT_NULL.getDescricao())) {
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+				// seta os valores juntamente com o tipo de comparacao is null,
+				// not null...
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao());
+			} else {
+
+				// seta as juncao entre as primissas AND, OR...
+				if (i > 1) {
+					queryString
+							.append(" "
+									+ argumentoVO.getPremissaSQL()
+											.getDescricao() + " ");
+				}
+
+				// seta os valores juntamente com o tipo de comparacao =,>,<,
+				// not null...
+				queryString.append(argumentoVO.getAtributo()
+						+ argumentoVO.getCondicaoSQL().getDescricao() + " ?"
+						+ i);
+			}
+
+			i++;
+		}
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+
+		// setando o valor das determinadas posições dos parametros
+		i = 1;
+		for (ArgumentoVO argumentoVO : args) {
+
+			if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.LIKE.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.NOT_LIKE.getDescricao())) {
+
+				query.setParameter(i, "%" + argumentoVO.getValor() + "%");
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IS_NULL.getDescricao())
+					|| argumentoVO.getCondicaoSQL().getDescricao()
+							.equals(CondicaoSQL.IS_NOT_NULL.getDescricao())) {
+
+			} else if (argumentoVO.getCondicaoSQL().getDescricao()
+					.equals(CondicaoSQL.IN.getDescricao())) {
+				query.setParameter(i, argumentoVO.getValor().toString()
+						.replace("[", "").replace("]", ""));
+			} else {
+
+				query.setParameter(i, argumentoVO.getValor());
+
+			}
+			i++;
+		}
+
+		return (Long) query.getSingleResult();
+	}
+
+	@Override
+	public Long recuperarTotalRegistrosPorCamposLikeComRestricoes(
+			Map<String, Object> restricoes, Map<String, String> camposLike) {
+
+		StringBuffer queryString = new StringBuffer();
+		queryString.append("select count(*) from " + classe.getName()
+				+ " where ");
+
+		int i = 1;
+		for (Entry<String, Object> e : restricoes.entrySet()) {
+			if (i > 1) {
+				queryString.append(" and ");
+			}
+			queryString.append(e.getKey() + " = ?" + i);
+			i++;
+		}
+
+		for (Entry<String, String> e : camposLike.entrySet()) {
+			queryString.append(" and UPPER(cast(" + e.getKey()
+					+ " as string)) like UPPER(?" + i + ")");
+			i++;
+		}
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+
+		i = 1;
+		for (Entry<String, Object> e : restricoes.entrySet()) {
+			query.setParameter(i, e.getValue());
+			i++;
+		}
+		for (Entry<String, String> e : camposLike.entrySet()) {
+			query.setParameter(i, "%" + e.getValue().toString() + "%");
+			i++;
+		}
+
+		return (Long) query.getSingleResult();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarPaginado(Integer inicio, Integer tamanho,
+			String ordenacao, String order) {
+
+		StringBuffer query = new StringBuffer();
+		query.append(" from " + classe.getName() + " order by " + ordenacao
+				+ " " + order);
+
+		Query q = getEntityManager().createQuery(query.toString());
+
+		q.setFirstResult(inicio);
+		q.setMaxResults(tamanho);
+
+		return q.getResultList();
+	}
+
+	/**
+	 * Método responsável por montar query genérica quando as restrições são
+	 * campos like em qualquer lugar
+	 * 
+	 * @param Map
+	 *            <String, String> argumentos
+	 * @param String
+	 *            ordenacao
+	 * @param String
+	 *            ordem
+	 * @return javax.persistence.Query
+	 */
+	public Query montarQueryCamposLike(String ordenacao, String order,
+			Map<String, String> argumentos) {
+
+		StringBuffer queryString = new StringBuffer();
+		queryString.append(" from " + classe.getName() + " where ");
+
+		int i = 1;
+		for (Entry<String, String> e : argumentos.entrySet()) {
+			if (i > 1) {
+				queryString.append(" and ");
+			}
+			queryString.append("UPPER(cast(" + e.getKey()
+					+ " as string)) like UPPER( ?" + i + ")");
+			i++;
+		}
+
+		queryString.append(" order by " + ordenacao + " " + order);
+
+		Query q = getEntityManager().createQuery(queryString.toString());
+
+		i = 1;
+		for (Entry<String, String> e : argumentos.entrySet()) {
+			q.setParameter(i, "%" + e.getValue().toString() + "%");
+			i++;
+		}
+
+		return q;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarPorCamposLike(String ordenacao, String order,
+			Map<String, String> argumentos) {
+
+		Query q = montarQueryCamposLike(ordenacao, order, argumentos);
+		return q.getResultList();
+
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarPaginadoPorCamposLike(Integer inicio,
+			Integer tamanho, String ordenacao, String order,
+			Map<String, String> argumentos) {
+
+		Query q = montarQueryCamposLike(ordenacao, order, argumentos);
+
+		q.setFirstResult(inicio);
+		q.setMaxResults(tamanho);
+
+		return q.getResultList();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarPaginadoPorCamposArgumentoVO(Integer inicio,
+			Integer tamanho, String ordenacao, String order,
+			List<ArgumentoVO> args) {
+
+		Query q = montarQueryPorCampos(args, ordenacao, order);
+
+		q.setFirstResult(inicio);
+		q.setMaxResults(tamanho);
+
+		return q.getResultList();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarPaginadoComRestricoes(Integer inicio,
+			Integer tamanho, String ordenacao, String order,
+			Map<String, Object> restricoes) {
+
+		StringBuffer queryString = new StringBuffer();
+		queryString.append(" from " + classe.getName() + " where ");
+
+		int i = 1;
+		for (Entry<String, Object> e : restricoes.entrySet()) {
+			if (i > 1) {
+				queryString.append(" and ");
+			}
+			queryString.append(e.getKey() + " = ?" + i);
+			i++;
+		}
+
+		queryString.append(" order by " + ordenacao + " " + order);
+
+		Query q = getEntityManager().createQuery(queryString.toString());
+
+		i = 1;
+		for (Entry<String, Object> e : restricoes.entrySet()) {
+			q.setParameter(i, e.getValue());
+			i++;
+		}
+
+		q.setFirstResult(inicio);
+		q.setMaxResults(tamanho);
+
+		return q.getResultList();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<T> recuperarPaginadoPorCamposLikeComRestricoes(Integer inicio,
+			Integer tamanho, String ordenacao, String order,
+			Map<String, String> camposLike, Map<String, Object> restricoes) {
+
+		StringBuffer queryString = new StringBuffer();
+		queryString.append(" from " + classe.getName() + " where ");
+
+		int i = 1;
+		for (Entry<String, Object> e : restricoes.entrySet()) {
+			if (i > 1) {
+				queryString.append(" and ");
+			}
+			queryString.append(e.getKey() + " = ?" + i);
+			i++;
+		}
+
+		for (Entry<String, String> e : camposLike.entrySet()) {
+			queryString.append(" and UPPER(cast(" + e.getKey()
+					+ " as string)) like UPPER( ?" + i + ")");
+			i++;
+		}
+
+		queryString.append(" order by " + ordenacao + " " + order);
+
+		Query q = getEntityManager().createQuery(queryString.toString());
+
+		i = 1;
+		for (Entry<String, Object> e : restricoes.entrySet()) {
+			q.setParameter(i, e.getValue());
+			i++;
+		}
+		for (Entry<String, String> e : camposLike.entrySet()) {
+			q.setParameter(i, "%" + e.getValue().toString() + "%");
+			i++;
+		}
+
+		q.setFirstResult(inicio);
+		q.setMaxResults(tamanho);
+
+		return q.getResultList();
+	}
+
+	@Override
+	public T recuperarPorCampo(String campo, Object filtro) {
+		Map<String, Object> argumentos = new HashMap<String, Object>();
+		argumentos.put(campo, filtro);
+
+		return recuperarPorCampos(argumentos);
+	}
+
+	public Long recuperarTotalRegistrosPorCamposComExcecoes(
+			Map<String, Object> argumentos, Map<String, Object> excecoes) {
+
+		StringBuffer queryString = new StringBuffer();
+		queryString.append("select count(*) from " + classe.getName()
+				+ " where ");
+
+		int i = 0;
+		for (Entry<String, Object> e : argumentos.entrySet()) {
+			if (i > 0) {
+				queryString.append(" and ");
+			}
+			queryString.append(e.getKey() + " = ? ");
+			i++;
+		}
+
+		if (excecoes != null && !excecoes.isEmpty()) {
+			for (Entry<String, Object> e : excecoes.entrySet()) {
+				queryString.append(" and " + e.getKey() + " != ?");
+			}
+		}
+
+		Query q = getEntityManager().createQuery(queryString.toString());
+
+		i = 1;
+		for (Entry<String, Object> e : argumentos.entrySet()) {
+			q.setParameter(i, e.getValue());
+			i++;
+		}
+		if (!excecoes.isEmpty()) {
+			for (Entry<String, Object> e : excecoes.entrySet()) {
+				q.setParameter(i, e.getValue());
+				i++;
+			}
+		}
+
+		return (Long) q.getSingleResult();
+	}
+
+	@Override
+	public List<T> recuperarListaPorCampo(String campo, Object filtro) {
+		Map<String, Object> argumentos = new HashMap<String, Object>();
+		argumentos.put(campo, filtro);
+
+		return recuperarListaPorCampos(argumentos, null, null);
+	}
+
+	@Override
+	public List<T> recuperarListaPorCampoOrdenado(String campo, Object filtro,
+			String campoOrdenado) {
+		Map<String, Object> argumentos = new HashMap<String, Object>();
+		argumentos.put(campo, filtro);
+
+		return recuperarListaPorCampos(argumentos, campoOrdenado, "ASC");
+	}
+
+	@Override
+	public boolean existeNaSessao(T objeto) {
+		if (getEntityManager().contains(objeto))
+			return true;
+		else
+			return false;
+	}
+
+	@Override
+	public Long recuperarValorAgrupadoPorCampo(String campo, String TIPO_GROUP) {
+
+		if (Constantes.GROUP_COUNT.equals(TIPO_GROUP))
+			return (Long) getEntityManager().createQuery(
+					"select count(" + campo + ") from " + classe.getName())
+					.getSingleResult();
+		else if (Constantes.GROUP_MAX.equals(TIPO_GROUP))
+			return (Long) getEntityManager().createQuery(
+					"select max(" + campo + ") from " + classe.getName())
+					.getSingleResult();
+		else if (Constantes.GROUP_MIN.equals(TIPO_GROUP))
+			return (Long) getEntityManager().createQuery(
+					"select min(" + campo + ") from " + classe.getName())
+					.getSingleResult();
+		else if (Constantes.GROUP_AVG.equals(TIPO_GROUP))
+			return (Long) getEntityManager().createQuery(
+					"select avg(" + campo + ") from " + classe.getName())
+					.getSingleResult();
+
+		return 0L;
+
+	}
+
+	@Override
+	public Long recuperarValorAgrupadoPorCampos(Map<String, Object> argumentos,
+			String campoAgrupado, String TIPO_GROUP) {
+		StringBuffer queryString = new StringBuffer();
+		if (Constantes.GROUP_COUNT.equals(TIPO_GROUP))
+			queryString.append("select count(" + campoAgrupado + ") from "
+					+ classe.getName() + " where ");
+		else if (Constantes.GROUP_MAX.equals(TIPO_GROUP))
+			queryString.append("select max(" + campoAgrupado + ") from "
+					+ classe.getName() + " where ");
+		else if (Constantes.GROUP_MIN.equals(TIPO_GROUP))
+			queryString.append("select min(" + campoAgrupado + ") from "
+					+ classe.getName() + " where ");
+		else if (Constantes.GROUP_AVG.equals(TIPO_GROUP))
+			queryString.append("select avg(" + campoAgrupado + ") from "
+					+ classe.getName() + " where ");
+
+		int i = 1;
+		for (Entry<String, Object> e : argumentos.entrySet()) {
+			if (i > 1) {
+				queryString.append(" and ");
+			}
+			queryString.append(e.getKey() + " = ?" + i);
+			i++;
+		}
+
+		Query query = getEntityManager().createQuery(queryString.toString());
+
+		i = 1;
+		for (Entry<String, Object> e : argumentos.entrySet()) {
+			query.setParameter(i, e.getValue());
+			i++;
+		}
+
+		return (Long) query.getSingleResult();
+
+	}
+
+	/**
+	 * @objetivo Recuperar um único registro de uma tabela usando LIMIT
+	 * @author Layenis Gonçalves
+	 * @dataUltimaModificacao 10/05/2012
+	 * @param campo
+	 * @param filtro
+	 * @param ordenacao
+	 * @param order
+	 * @return bean
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public T recuperarUnicoRegistro(String campo, Object filtro,
+			String ordenacao, String order) {
+		StringBuilder query = new StringBuilder();
+		query.append(" from " + classe.getName());
+		query.append(" where " + campo + " = ? ");
+		query.append(" order by " + ordenacao);
+		query.append(" " + order);
+
+		Query q = getEntityManager().createQuery(query.toString());
+		q.setParameter(1, filtro);
+		q.setMaxResults(1);
+
+		try {
+			return (T) q.getSingleResult();
+		} catch (NoResultException ex) {
+			return null;
+		}
+	}
+
+	@Override
+	public List<ClasseAuditada<T>> recuperarHistorico(Long id) {
+		AuditReader auditoria = AuditReaderFactory.get(getEntityManager());
+
+		AuditQuery query = auditoria.createQuery()
+				.forRevisionsOfEntity(classe, false, true)
+				.add(AuditEntity.id().eq(id))
+				.addOrder(AuditEntity.revisionNumber().desc());
+
+		List<Object[]> raw_results = query.getResultList();
+		List<ClasseAuditada<T>> lista = new ArrayList<ClasseAuditada<T>>();
+		for (Object[] data : raw_results) {
+			T t = (T) data[0];
+			RevInfo rev = (RevInfo) data[1];
+			RevisionType tipo = (RevisionType) data[2];
+
+			ClasseAuditada<T> obj = new ClasseAuditada<T>();
+			obj.setRevisao(rev);
+			obj.setTipoAlteracao(tipo);
+			obj.setObjeto(t);
+			lista.add(obj);
+		}
+		return lista;
+	}
+
+	@Override
+	public ClasseAuditada<T> recuperarHistorico(Long idEntidade, int revisao) {
+		AuditReader auditoria = AuditReaderFactory.get(getEntityManager());
+		T obj = auditoria.find(classe, idEntidade, revisao);
+
+		RevInfo rev = auditoria.findRevision(RevInfo.class, revisao);
+
+		ClasseAuditada<T> classeAuditada = new ClasseAuditada<T>();
+		classeAuditada.setObjeto(obj);
+		classeAuditada.setRevisao(rev);
+		return classeAuditada;
+	}
+
+	public <T> T initializeAndUnproxy(T entity) {
+		if (entity == null) {
+			throw new NullPointerException(
+					"Entidade passada para inicializar está null.");
+		}
+
+		Hibernate.initialize(entity);
+		if (entity instanceof HibernateProxy) {
+			entity = (T) ((HibernateProxy) entity)
+					.getHibernateLazyInitializer().getImplementation();
+		}
+		return entity;
+	}
+
+	public List<T> executarConsultaPaginada(Integer inicio, Integer tamanho,
+			String consulta) {
+		Query query = getEntityManager().createQuery(consulta);
+		query.setFirstResult(inicio);
+		query.setMaxResults(tamanho);
+		return query.getResultList();
+	}
+
+	public List<T> executarConsulta(String consulta) {
+		Query query = getEntityManager().createQuery(consulta);
+		return query.getResultList();
+	}
+
+	@Override
+	public Long executarConsultaQuantidade(String consulta) {
+		Query query = getEntityManager().createQuery(consulta);
+		try {
+			return (Long) query.getSingleResult();
+		} catch (NoResultException e) {
+		}
+		return 0L;
+	}
+}

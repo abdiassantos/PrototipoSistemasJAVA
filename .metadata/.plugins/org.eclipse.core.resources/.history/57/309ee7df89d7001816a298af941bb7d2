@@ -1,0 +1,254 @@
+package br.gov.pi.teresina.semf.bo;
+
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import javax.ejb.EJB;
+import javax.ejb.Stateless;
+import javax.faces.context.FacesContext;
+
+import br.gov.pi.teresina.semf.base.exception.RegraDeNegocioException;
+import br.gov.pi.teresina.semf.dao.PessoaFisicaDAO;
+import br.gov.pi.teresina.semf.dao.VinculoDAO;
+import br.gov.pi.teresina.semf.dao.util.ArgumentoVO;
+import br.gov.pi.teresina.semf.dao.util.Converte;
+import br.gov.pi.teresina.semf.dao.util.DataUtil;
+import br.gov.pi.teresina.semf.dao.util.Mascara;
+import br.gov.pi.teresina.semf.dao.util.Validacao;
+import br.gov.pi.teresina.semf.jsf.FacesUtil;
+import br.gov.pi.teresina.semf.mensagem.Mensagem;
+import br.gov.pi.teresina.semf.mensagem.MensagemRegraDeNegocio;
+import br.gov.pi.teresina.semf.modelo.PessoaFisica;
+import br.gov.pi.teresina.semf.modelo.Vinculo;
+
+@Stateless
+public class PessoaFisicaBO {
+
+	@EJB
+	private PessoaFisicaDAO pessoaFisicaDAO;
+	@EJB
+	private VinculoDAO vinculoDAO;
+	@EJB
+	private UsuarioBO usuarioBO;
+	
+	public PessoaFisica salvar(String dataNascimento, PessoaFisica pessoa)
+			throws Exception {
+		validar(dataNascimento, pessoa);
+		if (dataNascimento.equals("")) {
+			pessoa.setDataNascimento(null);
+		}
+		pessoa.getEndereco().setCep(
+				Mascara.removerCaracteresEspeciais(pessoa.getEndereco()
+						.getCep()));
+		pessoa.setCpf(Mascara.removerCaracteresEspeciais(pessoa.getCpf()));
+		if (dataNascimento != null && !dataNascimento.equals("")) {
+			pessoa.setDataNascimento(DataUtil.converterDateCalendar(Converte
+					.strToDate(dataNascimento)));
+		}
+		pessoa.setNomeRazao(Mascara.removeAcentos(pessoa.getNomeRazao().toUpperCase()));
+		pessoa.getEndereco().setBairro(
+				Mascara.removeAcentos(pessoa.getEndereco().getBairro()
+						.toUpperCase()));
+		pessoa.getEndereco().setLogradouro(
+				Mascara.removeAcentos(pessoa.getEndereco().getLogradouro()
+						.toUpperCase()));
+		pessoa.getEndereco().setComplemento(
+				Mascara.removeAcentos(pessoa.getEndereco().getComplemento()
+						.toUpperCase()));
+		pessoa = pessoaFisicaDAO.salvar(pessoa);
+		return pessoa;
+	}
+
+	private void validar(String dataNascimento, PessoaFisica pessoa)
+			throws RegraDeNegocioException {
+		StringBuffer mensagem = new StringBuffer();
+		if (pessoa.getCpf().trim().equals("")) {
+			mensagem.append("O campo CPF "
+					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+		} else if (!Validacao.validaCPF(pessoa.getCpf())) {
+			mensagem.append("O CPF informado é inválido.;");
+		}
+		if (pessoa.getNomeRazao().trim().equals("")) {
+			mensagem.append("O campo Nome "
+					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+		}
+		if (pessoa.getSexo() == null) {
+			mensagem.append("O campo Sexo "
+					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+		}
+//		if (dataNascimento.trim().equals("")) {
+//			mensagem.append("A campo Data de nascimento "
+//					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+//		} else if (!dataNascimento.trim().equals("")
+//				&& !Validacao.validaDataCompleto(dataNascimento)) {
+//			mensagem.append("A Data de nascimento informada é inválida.;");
+//		}		
+		if (!dataNascimento.trim().equals("")){
+			if (!Validacao.validaDataCompleto(dataNascimento)) {
+				mensagem.append("A Data de nascimento informada é inválida.;");
+			}			
+		}
+		if (pessoa.getEndereco().getCep().trim().equals("")) {
+			mensagem.append("O campo Cep "
+					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+		}
+		if (pessoa.getEndereco().getLogradouro().trim().equals("")) {
+			mensagem.append("O campo Logradouro "
+					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+		}
+//		if (pessoa.getEndereco().getBairro().trim().equals("")) {
+//			mensagem.append("O campo Bairro "
+//					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+//		}
+		if (pessoa.getEndereco().getNumero().trim().equals("")) {
+			mensagem.append("O campo Número "
+					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+		}
+//		if (pessoa.getEndereco().getMunicipio() == null
+//				|| pessoa.getEndereco().getMunicipio().getId() == null
+//				|| pessoa.getEndereco().getMunicipio().getId()
+//						.equals(new Long(0))) {
+//			mensagem.append("O campo Município "
+//					+ MensagemRegraDeNegocio.CAMPO_OBRIGATORIO + ";");
+//		}
+		if (pessoa.getEmail() != null && !pessoa.getEmail().trim().equals("")
+				&& !Validacao.validaEmail(pessoa.getEmail())) {
+			mensagem.append("O email informado é inválido.;");
+		}
+		if (mensagem.length() > 0) {
+			throw new RegraDeNegocioException(mensagem.toString());
+		}
+		if (verificarSeCpfExiste(pessoa)) {
+			mensagem.append("Já existe uma pessoa cadastrada com o CPF informado.;");
+		}
+		if (mensagem.length() > 0) {
+			throw new RegraDeNegocioException(mensagem.toString());
+		}
+	}
+
+	private boolean verificarSeCpfExiste(PessoaFisica pessoa) {
+		PessoaFisica pessoaBanco = pessoaFisicaDAO.recuperarPorCampo("cpf",
+				Mascara.removerCaracteresEspeciais(pessoa.getCpf()));
+		if (pessoaBanco != null && pessoaBanco.getId() != null
+				&& !pessoaBanco.getId().equals(pessoa.getId())) {
+			return true;
+		}
+		return false;
+	}
+	
+	public PessoaFisica recuperarPorId(Long codigo) {
+		return pessoaFisicaDAO.recuperarPorId(codigo);
+	}
+	
+	public List<PessoaFisica> retornaPFPorArgumentos(List<ArgumentoVO> args){
+		return pessoaFisicaDAO.recuperarListaPorCampos(args,"nomeRazao","asc");
+	}
+	
+	public PessoaFisica buscarPF(String cpf) {
+		return pessoaFisicaDAO.recuperarPorCampo("cpf", Mascara.removerCaracteresCPF(cpf));
+	}
+	
+	public PessoaFisica buscarPFComVinculos(String cpf) throws RegraDeNegocioException {
+		this.validaCpfParaBusca(cpf);
+		PessoaFisica pessoaFisica = pessoaFisicaDAO.recuperarPorCampo("cpf", Mascara.removerCaracteresCPF(cpf));
+//		if(pessoaFisica != null){
+//			pessoaFisica.getVinculos().size();
+//		}
+		return pessoaFisica;
+	}
+	
+	private void validaCpfParaBusca(String cpf) throws RegraDeNegocioException {
+		StringBuilder sb = new StringBuilder();
+		if(cpf == null || cpf.trim().equals("")){
+			sb.append("O campo CPF " + Mensagem.CAMPO_OBRIGATORIO + ";");
+		}else
+		if(!Validacao.validaCPF(cpf)){
+			sb.append("O campo CPF informado é inválido. " + ";");
+		}
+		if(sb.length() > 0){
+			throw new RegraDeNegocioException(sb.toString());
+		}
+	}
+	
+	public void validaPessoaVinculo(PessoaFisica pessoa) throws RegraDeNegocioException{
+		if (pessoa.getNomeRazao() == null || pessoa.getNomeRazao().trim().equals("")) {
+			throw new RegraDeNegocioException("O campo Nome " + Mensagem.CAMPO_OBRIGATORIO + ";");
+		}
+	}
+
+	public List<PessoaFisica> recuperarPorNome(String nomeConsultado){		
+		 return  pessoaFisicaDAO.recuperarListaPorCampoOrdenado("nomeRazao", nomeConsultado, "nomeRazao");	
+	}
+	
+	public List<PessoaFisica> retornaTodos(){
+		return pessoaFisicaDAO.recuperarTodos("nomeRazao","asc");
+	}
+	
+	public List<Vinculo> retornaVinculos(PessoaFisica pessoaFisica) {
+		return vinculoDAO.recuperarListaPorCampo("pessoaFisica.id", pessoaFisica.getId());
+	}
+	
+	public PessoaFisica salvarDefaultVinculo(PessoaFisica pessoaFisica) throws NoSuchAlgorithmException{
+		pessoaFisica.setCpf(Mascara.removerCaracteresEspeciais(pessoaFisica.getCpf()));
+		pessoaFisica.setNomeRazao(Mascara.removeAcentos(pessoaFisica.getNomeRazao().toUpperCase()));
+		
+		pessoaFisica = pessoaFisicaDAO.salvar(pessoaFisica);
+		usuarioBO.usuarioDefaultVinculo(pessoaFisica);
+		return pessoaFisica;
+	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public byte[] gerarRelatorioDeTodosPF()throws Exception {
+		String layout = "relatorios/relatorio_de_pessoa_fisica.jasper";
+
+		List<PessoaFisica> dataSource = new ArrayList<PessoaFisica>();
+		dataSource = this.retornaTodos();
+
+		if (dataSource.size() == 0) {
+			throw new RegraDeNegocioException("Nenhum registro foi encontrado.");
+		}
+
+		Map parametros = new HashMap();
+		parametros.put("brasao",
+				FacesContext.getCurrentInstance().getExternalContext()
+				.getRealPath("images/brasao_teresina.png"));
+		parametros.put("REPORT_LOCALE", new Locale("pt", "BR"));
+		try {
+			return FacesUtil.gerarRelatorioJasper(dataSource, parametros, layout);	
+		} catch (Exception e) {
+			e.getMessage();
+			throw new Exception(Mensagem.CONTACTAR_ADMINISTRADOR);
+		}
+	}
+
+	public PessoaFisicaDAO getPessoaFisicaDAO() {
+		return pessoaFisicaDAO;
+	}
+
+	public void setPessoaFisicaDAO(PessoaFisicaDAO pessoaFisicaDAO) {
+		this.pessoaFisicaDAO = pessoaFisicaDAO;
+	}
+
+	public VinculoDAO getVinculoDAO() {
+		return vinculoDAO;
+	}
+
+	public void setVinculoDAO(VinculoDAO vinculoDAO) {
+		this.vinculoDAO = vinculoDAO;
+	}
+
+	public UsuarioBO getUsuarioBO() {
+		return usuarioBO;
+	}
+
+	public void setUsuarioBO(UsuarioBO usuarioBO) {
+		this.usuarioBO = usuarioBO;
+	}	
+	
+	
+	
+}

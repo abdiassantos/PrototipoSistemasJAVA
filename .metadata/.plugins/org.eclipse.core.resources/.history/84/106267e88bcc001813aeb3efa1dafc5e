@@ -1,0 +1,270 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions">
+<ui:composition template="/jsf/Template/templateCadastro.xhtml">
+	<f:metadata>
+		<f:viewParam name="codigo" value="#{pessoaFisicaMB.codigo}"
+			converterMessage="Valor deve ser um número" />
+		<f:event listener="#{pessoaFisicaMB.editar}" type="preRenderView" />
+		<f:event listener="#{pessoaFisicaMB.setDefaultValues}"
+			type="preRenderView" />
+	</f:metadata>
+	<ui:param name="menu_pai" value="cadastro" />
+	<ui:param name="menu_filho" value="cadastrarRedeSocial" />
+	<ui:define name="sidebar">
+		<ui:include src="menuRedeSocial.xhtml" />
+	</ui:define>
+	<ui:define name="conteudo">
+		<div class="well corpo">
+			<div class="orgao pull-right">
+				<div class="msg-obrigatorio">
+					<div class="ui-messages-info ui-corner-all">
+						<span class="ui-messages-info-icon"></span> <span
+							class="ui-messages-info-summary">* Campos obrigatórios</span>
+					</div>
+				</div>
+			</div>
+			<h2>
+				<i class="glyphicon glyphicon-tasks"></i>Cadastro de Rede Social
+			</h2>
+			<p:spacer height="10" />
+			<h:form id="formCadastroPessoaFisica" class="formCadastro"
+				prependId="false">
+				<p:messages showDetail="false" showSummary="true" id="mensagem" />
+				<h:panelGrid columns="2" columnClasses="r20, l80">
+					<h:outputLabel value="* CPF:" />
+					<p:inputMask mask="999.999.999-99"
+						value="#{pessoaFisicaMB.pessoaFisica.cpf}" id="cpf"
+						styleClass="span3" />
+					<h:outputLabel value="* Nome:" />
+					<p:inputText value="#{pessoaFisicaMB.pessoaFisica.nome}"
+						maxlength="50" styleClass="span12" />
+					<h:outputLabel value="* Sexo:" />
+					<p:selectOneRadio id="sexo"
+						value="#{pessoaFisicaMB.pessoaFisica.sexo}">
+						<f:selectItems value="#{gerarSelectMB.sexos}" var="ope"
+							itemLabel="#{ope.descricao}" itemValue="#{ope}">
+						</f:selectItems>
+					</p:selectOneRadio>
+					<h:outputLabel value="RG:" />
+					<pe:inputNumber id="numeroRG" decimalPlaces="0" decimalSeparator=""
+						thousandSeparator="" maxValue="99999999999" style="width: 90px;"
+						value="#{pessoaFisicaMB.pessoaFisica.rg}" />
+					<h:outputLabel value="Data de Nascimento:" />
+					<p:inputMask mask="99/99/9999"
+						value="#{pessoaFisicaMB.dataNascimento}" size="12"
+						styleClass="span3" />
+					<h:outputLabel value="E-mail:" />
+					<p:inputText value="#{pessoaFisicaMB.pessoaFisica.email}" size="20"
+						styleClass="span12" />
+					<h:outputLabel value="Telefone:" />
+					<p:inputMask mask="(99) 99999-9999"
+						value="#{pessoaFisicaMB.pessoaFisica.telefoneResidencial}"
+						size="15" styleClass="span3" />
+					<h:outputLabel value="Celular:" />
+					<p:inputMask mask="(99) 99999-9999"
+						value="#{pessoaFisicaMB.pessoaFisica.celular}" size="15"
+						styleClass="span3" />
+				</h:panelGrid>
+
+				<h:panelGrid columns="2" columnClasses="r20, l80" id="endereco">
+
+					<h:outputLabel value="* CEP:" />
+					<h:panelGroup>
+						<p:inputMask mask="99.999-999"
+							value="#{pessoaFisicaMB.pessoaFisica.endereco.cep}" id="cep"
+							styleClass="span3" />
+						<p:commandButton image="ui-icon-circle-check" update="@form"
+							process="@form" title="Buscar Endereço"
+							action="#{pessoaFisicaMB.consultarEnderecoPorCep}">
+						</p:commandButton>
+						<p:commandButton onclick="PF('dialogEndereco').show()"
+							image="ui-icon-search" value="Pesquisar"
+							title="Pesquisar Endereço" ajax="true" immediate="true" />
+					</h:panelGroup>
+
+					<h:outputLabel value="* Logradouro:" />
+					<p:inputText
+						value="#{pessoaFisicaMB.pessoaFisica.endereco.logradouro}"
+						maxlength="50" styleClass="span12" />
+
+					<h:outputLabel value="* Número:" />
+					<p:inputText value="#{pessoaFisicaMB.pessoaFisica.endereco.numero}"
+						maxlength="10" styleClass="span2" />
+
+					<h:outputLabel value="Complemento:" />
+					<p:inputText
+						value="#{pessoaFisicaMB.pessoaFisica.endereco.complemento}"
+						maxlength="50" styleClass="span12" />
+
+					<h:outputLabel value="* Bairro:" />
+					<p:inputText value="#{pessoaFisicaMB.pessoaFisica.endereco.bairro}"
+						maxlength="50" styleClass="span12" />
+
+					<h:outputLabel value="Ponto de Referência:" />
+					<p:inputText
+						value="#{pessoaFisicaMB.pessoaFisica.endereco.pontoReferencia}"
+						maxlength="50" styleClass="span12" />
+
+					<h:outputLabel value="* UF Residencial:" />
+					<p:selectOneMenu value="#{pessoaFisicaMB.idUfResidencial}"
+						style="width:250px !important;">
+						<f:selectItems value="#{gerarSelectMB.ufs}" var="uf"
+							itemLabel="#{uf.descricao}" itemValue="#{uf.id}" />
+						<p:ajax process="@this" update="municipioResidencial"
+							listener="#{pessoaFisicaMB.carregarListaMunicipiosResidenciais}" />
+					</p:selectOneMenu>
+
+					<h:outputLabel value="* Município Residencial:" />
+					<p:selectOneMenu
+						value="#{pessoaFisicaMB.pessoaFisica.endereco.municipio.id}"
+						style="width:250px !important;" id="municipioResidencial">
+						<f:selectItems value="#{pessoaFisicaMB.municipiosResidenciais}"
+							var="municipio" itemLabel="#{municipio.descricao}"
+							itemValue="#{municipio.id}" />
+					</p:selectOneMenu>
+				</h:panelGrid>
+
+				<p:spacer height="20" />
+				<div align="center" class="div-botoes-inferior">
+					<p:commandButton value="Salvar" process="@form"
+						icon="ui-icon-check" action="#{pessoaFisicaMB.salvar}"
+						update="@form" />
+					<p:commandButton value="Novo Cadastro" type="button"
+						icon="ui-icon-plus"
+						onclick="javascript:window.location.href='cadastrarPessoaFisica.jsf'" />
+				</div>
+				<div class="span3 text-right"></div>
+				<p:spacer height="10" />
+			</h:form>
+
+			<p:dialog header="Consulta de Endereço" width="1050" height="500"
+				widgetVar="dialogEndereco" appendToBody="true" modal="true"
+				draggable="true" closeOnEscape="true" position="center"
+				resizable="false">
+
+				<h:form id="formDialogEndereco" prependId="false"
+					styleClass="formCadastro">
+
+					<p:messages showDetail="true" showSummary="false" id="mensagem4" />
+
+
+					<h:panelGrid columns="2" columnClasses="r20, l80">
+
+						<h:outputLabel value="UF Residencial:" />
+						<p:selectOneMenu
+							value="#{pessoaFisicaMB.pessoaFisica.endereco.municipio.uf}"
+							converter="#{conversorGenericoMB.uf}" panelStyle="width:250px"
+							var="t" style="width:250px !important;" filter="true"
+							filterMatchMode="startsWith">
+
+							<f:selectItems value="#{gerarSelectMB.ufs}" var="uf"
+								itemLabel="#{uf.descricao}" itemValue="#{uf}" />
+							<p:column>
+								<h:outputText value="#{t.descricao}" />
+							</p:column>
+
+							<p:ajax process="@this" update="municipioResidencialPopUP"
+								listener="#{pessoaFisicaMB.carregarListaMunicipiosResidenciais}" />
+
+						</p:selectOneMenu>
+
+						<h:outputLabel value="Município:" />
+						<p:selectOneMenu
+							value="#{pessoaFisicaMB.pessoaFisica.endereco.municipio}"
+							style="width:250px !important;" id="municipioResidencialPopUP"
+							converter="#{conversorGenericoMB.municipio}"
+							panelStyle="width:250px" var="t" filter="true"
+							filterMatchMode="startsWith">
+							<f:selectItems value="#{pessoaFisicaMB.municipiosResidenciais}"
+								var="municipio" itemLabel="#{municipio.descricao}"
+								itemValue="#{municipio}" />
+							<p:column>
+								<h:outputText value="#{t.descricao}" />
+							</p:column>
+						</p:selectOneMenu>
+
+
+						<h:outputLabel for="logradouro" value="* Logradouro: " />
+						<p:inputText id="logradouro" required="true"
+							requiredMessage="O campo Logradouro é obrigatório"
+							value="#{pessoaFisicaMB.logradouroConsulta}" maxlength="50"
+							styleClass="span6" />
+
+					</h:panelGrid>
+
+					<p:spacer height="10px" />
+
+					<div class="text-center cadastro-topo">
+						<p:commandButton value="Pesquisar" update="dataTableP mensagem4"
+							action="#{pessoaFisicaMB.consultarEndereco}" icon="ui-icon-check" />
+					</div>
+
+
+					<p:spacer height="10px" />
+
+					<p:dataTable id="dataTableP" styleClass="dataTable" var="endereco"
+						value="#{pessoaFisicaMB.enderecos}" rowIndexVar="index"
+						emptyMessage="Nenhum registro encontrado"
+						loadingMessage="Carregando..." lazy="true" paginator="true"
+						reflow="true" rows="8" rowKey="endereco.id" dynamic="true"
+						rowsPerPageTemplate="10,20,30" paginatorPosition="bottom"
+						paginatorTemplate="{CurrentPageReport}  {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+						currentPageReportTemplate="{totalRecords} Registro(s) | Página: {currentPage} de {totalPages}">
+
+						<f:facet name="header">
+							<h:outputText value="Endereços" />
+						</f:facet>
+
+						<p:column styleClass="index-table">
+							<h:outputText value="#{index+1}" />
+						</p:column>
+
+						<p:column headerText="Tipo Logradouro">
+							<h:outputText value="#{endereco.tipoLogradouro}" />
+						</p:column>
+
+						<p:column headerText="Logradouro">
+							<h:outputText value="#{endereco.logradouro}" />
+						</p:column>
+
+						<p:column headerText="Bairro">
+							<h:outputText value="#{endereco.bairro}" />
+						</p:column>
+
+						<p:column headerText="CEP" styleClass="text-center">
+							<h:outputText value="#{endereco.cep}" />
+						</p:column>
+
+						<p:column headerText="Município" styleClass="text-center">
+							<h:outputText value="#{endereco.municipio}" />
+						</p:column>
+
+						<p:column headerText="UF" styleClass="text-center">
+							<h:outputText value="#{endereco.uf}" />
+						</p:column>
+
+						<p:column headerText="Ações" styleClass="coluna-acoes">
+
+							<p:commandLink title="Selecionar" ajax="true"
+								action="#{pessoaFisicaMB.setarEnderecoPagina}" immediate="true"
+								update="endereco" oncomplete="PF('dialogEndereco').hide()">
+								<span class="glyphicon glyphicon-check"></span>
+
+								<f:setPropertyActionListener
+									target="#{pessoaFisicaMB.idPesquisa}" value="#{endereco.id}" />
+
+							</p:commandLink>
+						</p:column>
+					</p:dataTable>
+				</h:form>
+			</p:dialog>
+
+		</div>
+	</ui:define>
+</ui:composition>
+</html>

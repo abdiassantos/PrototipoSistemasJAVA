@@ -1,0 +1,364 @@
+package br.gov.pi.teresina.semf.mb;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.PostConstruct;
+import javax.ejb.EJB;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+
+import br.gov.pi.ejb.correios.bo.EnderecoBO;
+import br.gov.pi.ejb.correios.dao.EnderecoDAO;
+import br.gov.pi.ejb.correios.mensagem.GerarMensagem;
+import br.gov.pi.teresina.semf.base.exception.RegraDeNegocioException;
+import br.gov.pi.teresina.semf.bo.AcessoPaginaBO;
+import br.gov.pi.teresina.semf.bo.GestorBO;
+import br.gov.pi.teresina.semf.bo.OrgaoBO;
+import br.gov.pi.teresina.semf.bo.PessoaBO;
+import br.gov.pi.teresina.semf.bo.RedesSociaisBO;
+import br.gov.pi.teresina.semf.bo.UnidadeBO;
+import br.gov.pi.teresina.semf.dao.GestorDAO;
+import br.gov.pi.teresina.semf.dao.OrgaoRedeSocialDAO;
+import br.gov.pi.teresina.semf.enums.Zona;
+import br.gov.pi.teresina.semf.factory.OrgaoDAOFactory;
+import br.gov.pi.teresina.semf.mensagem.Mensagem;
+import br.gov.pi.teresina.semf.mensagem.MensagemRegraDeNegocio;
+import br.gov.pi.teresina.semf.modelo.AcessoPagina;
+import br.gov.pi.teresina.semf.modelo.Gestor;
+import br.gov.pi.teresina.semf.modelo.Orgao;
+import br.gov.pi.teresina.semf.modelo.OrgaoRedeSocial;
+import br.gov.pi.teresina.semf.modelo.Pessoa;
+import br.gov.pi.teresina.semf.modelo.RedesSociais;
+import br.gov.pi.teresina.semf.modelo.Unidade;
+
+@ManagedBean
+@ViewScoped
+public class OrgaoMB {
+
+	@EJB
+	private OrgaoBO orgaoBO;
+	@EJB
+	private OrgaoDAOFactory factory;
+	@EJB
+	private UnidadeBO unidadeBO;
+	@EJB
+	private AcessoPaginaBO acessoPaginaBO;
+	@EJB
+	private EnderecoBO enderecoBO;
+	@EJB
+	private EnderecoDAO enderecoDAO;
+	@EJB
+	private GestorDAO gestorDAO;
+	@EJB
+	private PessoaBO pessoaBO;
+	@EJB
+	private GestorBO gestorBO;
+	@EJB
+	private OrgaoRedeSocialDAO orgaoRSDAO;
+	@EJB
+	private RedesSociaisBO redesSociaisBO;
+	
+	private OrgaoRedeSocial orgaoRedeSocial;
+	private AcessoPagina acessoPagina;
+	private Orgao orgao;
+	private Unidade unidade;
+	private Gestor gestor;
+	private Zona zona;
+
+	private List<Orgao> orgaos;
+	private List<Gestor> gestores;
+	private List<Unidade> unidades;
+	private List<OrgaoRedeSocial> redes;
+	private List<RedesSociais> redesSociais = new ArrayList<RedesSociais>();
+	
+	private String gestorPortariaNomeacao;
+	private String zonaSelecionada;
+	private String descOrgao;
+	private String gestorDescricaoPesquisada;
+
+	private Long codigo;
+	private Long unidadeConsultada;
+	private Long gestorID;
+	private Long redeSocialID;
+	
+	private boolean geraDATM;
+
+	public OrgaoMB() {
+		orgao = new Orgao();
+		orgaos = new ArrayList<Orgao>();
+		unidades = new ArrayList<Unidade>();
+		gestores  = new ArrayList<Gestor>();
+		redes = new ArrayList<OrgaoRedeSocial>();
+		orgaoRedeSocial = new OrgaoRedeSocial();
+	}
+	
+	@PostConstruct
+	public void init() {
+		unidades = unidadeBO.recuperarTodos();
+		redesSociais = redesSociaisBO.retornaTodos();
+	}
+	
+	public void salvar() {
+		try {
+			orgao = orgaoBO.salvar(orgao,redes);
+			GerarMensagem.mensagemSucesso(
+					MensagemRegraDeNegocio.OPERACAO_SUCESSO, null);
+		} catch (RegraDeNegocioException e) {
+			GerarMensagem.mensagensErro(e.getMessage());
+		} catch (Exception e) {
+			e.printStackTrace();
+			GerarMensagem.mensagemErro(
+					MensagemRegraDeNegocio.CONTACTAR_ADMINISTRADOR, null);
+		}
+	}
+
+	
+	public void editar() throws RegraDeNegocioException {
+		if (codigo != null) {
+				orgao = orgaoBO.recuperarPorId(codigo);
+		}
+	}
+	
+	public void recuperarGestorPorID() {
+		gestor = gestorBO.recuperarPorId(gestorID);
+		if(gestor != null){
+			orgao.setGestor(gestor);
+		}else{
+			GerarMensagem.mensagemAlerta(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+		}
+	}
+	
+	public void recuperarGestoresPorCamposDialog() {
+		if(gestorDescricaoPesquisada == null || gestorDescricaoPesquisada.equals("")){
+			gestores = gestorBO.recuperarTodos();
+		}else{
+			gestores = gestorBO.recuperarGestorPorNome(gestorDescricaoPesquisada);
+		}
+		if(gestores.isEmpty()){
+			GerarMensagem.mensagemAlerta(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+		}
+	}
+	
+	public void adicionarGestorSelecionadoDialog(Gestor gestorDialog) {
+		if (gestorDialog!= null) {
+			orgao.setGestor(gestorDialog);
+			gestorID = orgao.getGestor().getId();
+		}
+	}
+	
+	public void adicionarRedeSocial(){
+		if(redeSocialID == null){
+			GerarMensagem.mensagemErro(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+			
+		}else if(orgaoRedeSocial.getDescricao() == null || orgaoRedeSocial.getDescricao().equals("")){
+			GerarMensagem.mensagemErro(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+			
+		}else{
+			OrgaoRedeSocial orgRedeSocial = new OrgaoRedeSocial();
+			orgRedeSocial.setOrgao(orgao);
+			orgRedeSocial.setDescricao(orgaoRedeSocial.getDescricao());
+			orgRedeSocial.setRedesSociais(redesSociaisBO.recuperarPorId(redeSocialID));
+			redes.add(orgRedeSocial);
+			
+			redeSocialID = null;
+			orgaoRedeSocial = new OrgaoRedeSocial();
+		}
+		
+	}
+	
+    public void excluirRedeSocialSelecionada(OrgaoRedeSocial ors) {
+		if (ors!= null) {
+			redes.remove(ors);
+		}
+	}
+	
+	public void pesquisarGestor() {
+		List<Pessoa> pessoas;
+		pessoas = pessoaBO.recuperarPorNome(gestorDescricaoPesquisada);
+		
+		for (Pessoa pessoa : pessoas) {
+			if (pessoa.getTipoPessoa().toUpperCase().equals("GESTOR")) {
+				gestores.add((Gestor) pessoa);
+			}
+		}
+		if(gestores.isEmpty()){
+			GerarMensagem.mensagemAlerta(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+		}
+	}
+	
+	
+	public void consultarOrgaosPorParametros(){
+	
+		orgaos = orgaoBO.recuperarOrgaosPorParametros(unidadeConsultada, zonaSelecionada, descOrgao);
+		if(orgaos.isEmpty()){
+			GerarMensagem.mensagemAlerta(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+		}
+	}
+	
+	// Metodos Getters e Setters:
+	public Orgao getOrgao() {
+		return orgao;
+	}
+
+	public void setOrgao(Orgao orgao) {
+		this.orgao = orgao;
+	}
+
+	public List<Unidade> getUnidades() {
+		return unidades;
+	}
+
+	public void setUnidades(List<Unidade> unidades) {
+		this.unidades = unidades;
+	}
+
+	public AcessoPagina getAcessoPagina() {
+		return acessoPagina;
+	}
+
+	public void setAcessoPagina(AcessoPagina acessoPagina) {
+		this.acessoPagina = acessoPagina;
+	}
+
+	public Long getCodigo() {
+		return codigo;
+	}
+
+	public void setCodigo(Long codigo) {
+		this.codigo = codigo;
+	}
+
+	public Unidade getUnidade() {
+		return unidade;
+	}
+
+	public void setUnidade(Unidade unidade) {
+		this.unidade = unidade;
+	}
+	
+	public void setOrgaos(List<Orgao> orgaos) {
+		this.orgaos = orgaos;
+	}
+	
+	public String getDescOrgao() {
+		return descOrgao;
+	}
+
+	public void setDescOrgao(String descOrgao) {
+		this.descOrgao = descOrgao;
+	}
+
+	public List<Orgao> getOrgaos() {
+		return orgaos;
+	}
+
+	public void setOrgãos(List<Orgao> orgaos) {
+		this.orgaos = orgaos;
+	}
+
+	public Long getUnidadeConsultada() {
+		return unidadeConsultada;
+	}
+
+	public void setUnidadeConsultada(Long unidadeSelecionada) {
+		this.unidadeConsultada = unidadeSelecionada;
+	}
+
+	public boolean isGeraDATM() {
+		return geraDATM;
+	}
+
+	public void setGeraDATM(boolean geraDATM) {
+		this.geraDATM = geraDATM;
+	}
+
+	public String getZonaSelecionada() {
+		return zonaSelecionada;
+	}
+
+	public void setZonaSelecionada(String zonaSelecionada) {
+		this.zonaSelecionada = zonaSelecionada;
+	}
+
+	public List<Gestor> getGestores() {
+		return gestores;
+	}
+
+	public void setGestores(List<Gestor> gestores) {
+		this.gestores = gestores;
+	}
+
+	public String getGestorDescricaoPesquisada() {
+		return gestorDescricaoPesquisada;
+	}
+
+	public void setGestorDescricaoPesquisada(String gestorDescricaoPesquisada) {
+		this.gestorDescricaoPesquisada = gestorDescricaoPesquisada;
+	}
+	
+	public String getGestorPortariaNomeacao() {
+		return gestorPortariaNomeacao;
+	}
+	
+	public void setGestorPortariaNomeacao(String gestorPortariaNomeacao) {
+		this.gestorPortariaNomeacao = gestorPortariaNomeacao;
+	}
+
+	public Long getGestorID() {
+		return gestorID;
+	}
+
+	public void setGestorID(Long gestorID) {
+		this.gestorID = gestorID;
+	}
+
+	public Gestor getGestor() {
+		return gestor;
+	}
+
+	public void setGestor(Gestor gestor) {
+		this.gestor = gestor;
+	}
+	
+	public Zona getZona() {
+		return zona;
+	}
+
+	public void setZona(Zona zona) {
+		this.zona = zona;
+	}
+
+	public OrgaoRedeSocial getOrgaoRedeSocial() {
+		return orgaoRedeSocial;
+	}
+
+	public void setOrgaoRedeSocial(OrgaoRedeSocial orgaoRedeSocial) {
+		this.orgaoRedeSocial = orgaoRedeSocial;
+	}
+
+	public List<OrgaoRedeSocial> getRedes() {
+		return redes;
+	}
+
+	public void setRedes(List<OrgaoRedeSocial> redes) {
+		this.redes = redes;
+	}
+
+	public List<RedesSociais> getRedesSociais() {
+		return redesSociais;
+	}
+
+	public void setRedesSociais(List<RedesSociais> redesSociais) {
+		this.redesSociais = redesSociais;
+	}
+
+	public Long getRedeSocialID() {
+		return redeSocialID;
+	}
+
+	public void setRedeSocialID(Long redeSocialID) {
+		this.redeSocialID = redeSocialID;
+	}
+
+}

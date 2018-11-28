@@ -1,0 +1,173 @@
+package br.gov.pi.teresina.semf.base;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.List;
+import java.util.Map;
+
+import br.gov.pi.teresina.semf.auditoria.ClasseAuditada;
+import br.gov.pi.teresina.semf.dao.util.ArgumentoVO;
+
+public interface BaseDAO<T> {
+
+	public T salvar(T objeto);
+
+	public void alterar(T objeto);
+
+	public void deletar(T objeto);
+
+	public boolean hasPrimaryKey(T objeto) throws SecurityException,
+			IllegalArgumentException, IllegalAccessException,
+			InvocationTargetException;
+
+	public T merge(T objeto);
+
+	public T recuperarPorId(Long id);
+	
+	public T recuperarPorIdDetached(Long id);
+
+	public T recuperarPorCampo(String campo, Object filtro);
+
+	public List<T> recuperarTodos(String ordenacao, String ordem);
+
+	public T recuperarPorCampos(Map<String, Object> argumentos);
+
+	public List<T> recuperarListaPorCampo(String campo, Object filtro);
+
+	/**
+	 * Método responsável por recuperar lista com restrições onde os campos são
+	 * igualados, bem como orderna-los
+	 * 
+	 * @param Map
+	 *            <String, Object> argumentos
+	 * @param String
+	 *            ordenacao
+	 * @param String
+	 *            ordem
+	 * @return javax.persistence.Query
+	 * 
+	 */
+	public List<T> recuperarListaPorCampos(Map<String, Object> argumentos,
+			String ordenacao, String order);
+
+	public Long recuperarTotalRegistros();
+	
+	public void recuperarTOdosPF();
+
+	public Long recuperarTotalRegistrosPorCamposLike(
+			Map<String, String> argumentos);
+
+	public Long recuperarTotalRegistrosComRestricoes(
+			Map<String, Object> restricoes);
+
+	public Long recuperarTotalRegistrosPorCamposLikeComRestricoes(
+			Map<String, Object> restricoes, Map<String, String> camposLike);
+
+	public List<T> recuperarPaginado(Integer inicio, Integer tamanho,
+			String ordenacao, String order);
+
+	public List<T> recuperarPaginadoPorCamposLike(Integer inicio,
+			Integer tamanho, String ordenacao, String order,
+			Map<String, String> argumentos);
+
+	public List<T> recuperarPaginadoPorCamposArgumentoVO(Integer inicio,
+			Integer tamanho, String ordenacao, String order,
+			List<ArgumentoVO> args);
+
+	public List<T> recuperarPaginadoComRestricoes(Integer inicio,
+			Integer tamanho, String ordenacao, String order,
+			Map<String, Object> restricoes);
+
+	public List<T> recuperarPaginadoPorCamposLikeComRestricoes(Integer inicio,
+			Integer tamanho, String ordenacao, String order,
+			Map<String, String> argumentos, Map<String, Object> restricoes);
+
+	public List<T> executarConsultaPaginada(Integer inicio, Integer tamanho,
+			String consulta);
+
+	public List<T> executarConsulta(String consulta);
+
+	public List<T> recuperarPorCamposLike(String ordenacao, String order,
+			Map<String, String> argumentos);
+
+	public Long recuperarTotalRegistrosPorCamposComExcecoes(
+			Map<String, Object> argumentos, Map<String, Object> excecoes);
+
+	public Long recuperarTotalRegistrosPorCamposArgumentoVO(
+			List<ArgumentoVO> args);
+
+	/**
+	 * Verificar se o determinado objeto esta na sessão do hibernate.
+	 * 
+	 * @param objeto
+	 * @return
+	 */
+	public boolean existeNaSessao(T objeto);
+
+	/**
+	 * Buscar o agrupamento de todas as ocorrencias de um determinado atributo
+	 * da classe. tais agrupamentos pode ser: COUNT, MAX, MIN, AVG.
+	 * 
+	 * @param campoAgrupado
+	 * @param TIPO_GROUP
+	 * @return
+	 */
+	public Long recuperarValorAgrupadoPorCampo(String campoAgrupado,
+			String TIPO_GROUP);
+
+	/**
+	 * Buscar o agrupamento de um determinado atributo da classe, que estejam de
+	 * acordo com o filtro informandos no parametro argumentos. tais
+	 * agrupamentos pode ser: COUNT, MAX, MIN, AVG.
+	 * 
+	 * @param argumentos
+	 * @param campoAgrupado
+	 * @param TIPO_GROUP
+	 * @return
+	 */
+	public Long recuperarValorAgrupadoPorCampos(Map<String, Object> argumentos,
+			String campoAgrupado, String TIPO_GROUP);
+
+	public List<T> recuperarListaPorCampos(List<ArgumentoVO> argumentos);
+
+	public List<T> recuperarListaPorCampos(List<ArgumentoVO> argumentos,
+			String ordenacao, String order);
+
+	public T recuperarPorCampos(List<ArgumentoVO> argumentos);
+
+	public T recuperarPorCampos(ArgumentoVO argumento);
+
+	public T recuperarPorCampos(ArgumentoVO argumento,
+			List<String> camposOrdenacao, String tipoOrdenacao);
+
+	public List<T> recuperarListaPorCampos(ArgumentoVO argumento);
+
+	public Long valueID(Object objeto);
+
+	public String primaryKey(T objeto);
+
+	public T mergeSemServico(T objeto);
+
+	public T recuperarPorCampos(List<ArgumentoVO> argumentos, String ordenacao,
+			String order);
+
+	public T recuperarPorCampos(ArgumentoVO argumento, String ordenacao,
+			String order);
+
+	public List<T> recuperarListaPorCampoOrdenado(String campo, Object filtro,
+			String campoOrdenado);
+
+	public T recuperarUnicoRegistro(String campo, Object filtro,
+			String ordenacao, String order);
+
+	void deletarSemServico(T objeto);
+
+	public List<ClasseAuditada<T>> recuperarHistorico(Long id);
+
+	public ClasseAuditada<T> recuperarHistorico(Long idEntidade, int revisao);
+
+	public <T> T initializeAndUnproxy(T entity);
+
+	public Long executarConsultaQuantidade(String consulta);
+
+	List<T> recuperarTodosPorTabela(String ordenacao, String ordem, String tabela);
+}

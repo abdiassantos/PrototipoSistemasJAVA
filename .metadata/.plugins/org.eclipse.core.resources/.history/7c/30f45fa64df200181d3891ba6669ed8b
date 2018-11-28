@@ -1,0 +1,75 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui">
+
+<ui:composition template="/jsf/Template/templateConsulta.xhtml">
+	
+	<ui:param name="menu_pai" value="cadastro" />
+	<ui:param name="menu_filho" value="consultarRedeSocial" />
+	
+	<ui:define name="sidebar">
+		<ui:include src="menuRedeSocial.xhtml" />
+	</ui:define>
+
+	<ui:define name="conteudo">
+		<div class="well corpo">
+			<h2><i class="glyphicon glyphicon-tasks"></i>Consulta de Rede Social</h2>
+
+			<h:form id="formConsulta" styleClass="formConsulta" prependId="false">
+	
+				<p:focus for="nome" />	
+				<h:panelGrid columns="2" columnClasses="r10, l90">
+
+					<h:outputText value="Nome:" />
+					<p:inputText value="#{redesSociaisMB.nomeConsultado}" maxlength="40" styleClass="span12" id="nome" />
+
+				</h:panelGrid>
+
+				<div class="text-center cadastro-topo">
+					<p:commandButton value="Buscar" process="@form" update="@form" 
+						action="#{redesSociaisMB.consultar}" icon="ui-icon-check" />
+		
+					<p:commandButton value="Limpar" type="button" icon="ui-icon-refresh"
+						onclick="javascript:window.location.href='consultarRedeSocial.jsf'" />
+						
+				</div>
+	
+				<p:messages showDetail="false" showSummary="true" id="mensagem" />
+
+				<p:dataTable id="dataTable" styleClass="dataTable" var="redeSocial" value="#{redesSociaisMB.listaRedesSociais}" rowIndexVar="index"
+					emptyMessage="Nenhum registro encontrado" loadingMessage="Carregando..." lazy="true"
+					paginator="true" rows="10" dynamic="true" rowKey="perfil.id"
+					rowsPerPageTemplate="10,20,30" paginatorPosition="bottom" 
+					paginatorTemplate="{CurrentPageReport}  {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+					currentPageReportTemplate="{totalRecords} Registro(s) | Página: {currentPage} de {totalPages}">
+
+					<f:facet name="header">
+						<h:outputText value="Redes Sociais" />
+					</f:facet>
+					
+					<p:column styleClass="index-table">
+						<h:outputText value="#{index+1}" />
+					</p:column>
+
+					<p:column headerText="Descrição">
+						<h:outputText value="#{redeSocial.descricao}" />
+					</p:column>
+
+					<p:column headerText="Ações" styleClass="coluna-acoes">
+						<h:outputLink value="cadastrarRedeSocial.jsf?codigo=#{redeSocial.id}" title="Editar"
+							rendered="#{permissoesAcessoMB.verificarPermissao(permissoesAcessoMB.EDITAR)}">
+							<span class="glyphicon glyphicon-pencil"></span>
+						</h:outputLink>
+					</p:column>
+
+				</p:dataTable>
+	
+			</h:form>
+		</div>
+
+	</ui:define>
+</ui:composition>
+</html>

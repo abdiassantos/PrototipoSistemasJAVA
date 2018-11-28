@@ -1,0 +1,335 @@
+package br.gov.pi.teresina.semf.mb;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.PostConstruct;
+import javax.ejb.EJB;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+
+import br.gov.pi.ejb.correios.bo.EnderecoBO;
+import br.gov.pi.ejb.correios.dao.EnderecoDAO;
+import br.gov.pi.ejb.correios.mensagem.GerarMensagem;
+import br.gov.pi.teresina.semf.base.exception.RegraDeNegocioException;
+import br.gov.pi.teresina.semf.bo.AcessoPaginaBO;
+import br.gov.pi.teresina.semf.bo.GestorBO;
+import br.gov.pi.teresina.semf.bo.OrgaoBO;
+import br.gov.pi.teresina.semf.bo.PessoaBO;
+import br.gov.pi.teresina.semf.bo.UnidadeBO;
+import br.gov.pi.teresina.semf.dao.GestorDAO;
+import br.gov.pi.teresina.semf.factory.OrgaoDAOFactory;
+import br.gov.pi.teresina.semf.mensagem.Mensagem;
+import br.gov.pi.teresina.semf.mensagem.MensagemRegraDeNegocio;
+import br.gov.pi.teresina.semf.modelo.AcessoPagina;
+import br.gov.pi.teresina.semf.modelo.Gestor;
+import br.gov.pi.teresina.semf.modelo.Orgao;
+import br.gov.pi.teresina.semf.modelo.Pessoa;
+import br.gov.pi.teresina.semf.modelo.TipoFuncionalidade;
+import br.gov.pi.teresina.semf.modelo.Unidade;
+
+
+
+@ManagedBean
+@ViewScoped
+public class OrgaoMB {
+
+	@EJB
+	private OrgaoBO orgaoBO;
+	@EJB
+	private OrgaoDAOFactory factory;
+	@EJB
+	private UnidadeBO unidadeBO;
+	@EJB
+	private AcessoPaginaBO acessoPaginaBO;
+	@EJB
+	private EnderecoBO enderecoBO;
+	@EJB
+	private EnderecoDAO enderecoDAO;
+	@EJB
+	private GestorDAO gestorDAO;
+	@EJB
+	private PessoaBO pessoaBO;
+	@EJB
+	private  GestorBO gestorBO;
+	
+	private Gestor gestorPesquisado;
+	private AcessoPagina acessoPagina;
+	private Orgao orgao;
+	private Long codigo;
+	private Unidade unidade;
+	private Gestor gestor;
+	private Gestor gestorSelecionado;
+
+	private List<TipoFuncionalidade> funcionalidadesSelecionadas =  new ArrayList<TipoFuncionalidade>();
+	private List<Orgao> orgaos = new ArrayList<Orgao>();
+	private List<Gestor> gestores  = new ArrayList<Gestor>();
+	private List<Unidade> unidades = new ArrayList<Unidade>() ;
+	
+	private String gestorPortariaNomeacao;
+	private String zonaSelecionada;
+	private String descOrgao;
+	private String gestorDescricaoPesquisada;
+
+	private Long unidadeSelecionada;
+	private Long gestorID;
+	
+	private boolean geraDATM;
+	private boolean exibir = false;
+	private boolean renderizar = true;	
+	
+	public OrgaoMB() {
+		orgao = new Orgao();
+	}
+	
+	@PostConstruct
+	public void init() {
+		unidades = unidadeBO.recuperarTodos();
+	}
+	
+	
+	public void salvar() {
+		try {
+			orgao = orgaoBO.salvar(orgao, zonaSelecionada);
+			renderizar = true;
+			GerarMensagem.mensagemSucesso(
+					MensagemRegraDeNegocio.OPERACAO_SUCESSO, null);
+		} catch (RegraDeNegocioException e) {
+			GerarMensagem.mensagemErro(e.getMessage(), null);
+		} catch (Exception e) {
+			e.printStackTrace();
+			GerarMensagem.mensagemErro(
+					MensagemRegraDeNegocio.CONTACTAR_ADMINISTRADOR, null);
+		}
+	}
+
+	
+	public void editar() {
+		if (codigo != null) {
+			try {
+				orgao = orgaoBO.recuperarPorId(codigo);
+			} catch (RegraDeNegocioException e) {
+				e.printStackTrace();
+			}
+			exibir = true;
+		}
+	}
+	
+	
+	public void recuperarGestorPorID() {
+		gestor = gestorBO.recuperarPorId(gestorID);
+		if(gestor != null){
+			orgao.setGestor(gestor);
+		}else{
+			GerarMensagem.mensagemAlerta(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+		}
+	}
+	
+	public void recuperarGestoresPorCamposDialog() {
+		if(gestorDescricaoPesquisada == null || gestorDescricaoPesquisada.equals("")){
+			gestores = gestorBO.recuperarTodos();
+		}else{
+			gestores = gestorBO.recuperarGestorPorNome(gestorDescricaoPesquisada);
+		}
+		if(gestores.isEmpty()){
+			GerarMensagem.mensagemAlerta(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+		}
+	}
+	
+	public void adicionarGestorSelecionadoDialog(Gestor gestorDialog) {
+		if (gestorDialog!= null) {
+			orgao.setGestor(gestorDialog);
+			gestorID = orgao.getGestor().getId();
+		}
+	}
+	
+	public void pesquisarGestor() {
+		List<Pessoa> pessoas;
+		pessoas = pessoaBO.recuperarPorNome(gestorDescricaoPesquisada);
+		
+		for (Pessoa pessoa : pessoas) {
+			if (pessoa.getTipoPessoa().toUpperCase().equals("GESTOR")) {
+				gestores.add((Gestor) pessoa);
+			}
+		}
+		if(gestores.isEmpty()){
+			GerarMensagem.mensagemAlerta(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+		}
+	}
+	
+	public void consultarOrgaosPorParametros(){
+	
+		orgaos = orgaoBO.recuperarOrgaosPorParametros(unidadeSelecionada, zonaSelecionada, descOrgao);
+		if(orgaos.isEmpty()){
+			GerarMensagem.mensagemAlerta(Mensagem.NENHUM_REGISTRO_ENCONTRADO, null);
+		}
+	}
+	
+	// Metodos Getters e Setters:
+	public Orgao getOrgao() {
+		return orgao;
+	}
+
+	public void setOrgao(Orgao orgao) {
+		this.orgao = orgao;
+	}
+
+	public List<Unidade> getUnidades() {
+		return unidades;
+	}
+
+	public void setUnidades(List<Unidade> unidades) {
+		this.unidades = unidades;
+	}
+
+	public AcessoPagina getAcessoPagina() {
+		return acessoPagina;
+	}
+
+	public void setAcessoPagina(AcessoPagina acessoPagina) {
+		this.acessoPagina = acessoPagina;
+	}
+
+	public Long getCodigo() {
+		return codigo;
+	}
+
+	public void setCodigo(Long codigo) {
+		this.codigo = codigo;
+	}
+
+	public List<TipoFuncionalidade> getFuncionalidadesSelecionadas() {
+		return funcionalidadesSelecionadas;
+	}
+
+	public void setFuncionalidadesSelecionadas(List<TipoFuncionalidade> funcionalidadesSelecionadas) {
+		this.funcionalidadesSelecionadas = funcionalidadesSelecionadas;
+	}
+
+	public Unidade getUnidade() {
+		return unidade;
+	}
+
+	public void setUnidade(Unidade unidade) {
+		this.unidade = unidade;
+	}
+	
+	public void setOrgaos(List<Orgao> orgaos) {
+		this.orgaos = orgaos;
+	}
+	
+	public String getDescOrgao() {
+		return descOrgao;
+	}
+
+	public void setDescOrgao(String descOrgao) {
+		this.descOrgao = descOrgao;
+	}
+
+	public List<Orgao> getOrgaos() {
+		return orgaos;
+	}
+
+	public void setOrgãos(List<Orgao> orgaos) {
+		this.orgaos = orgaos;
+	}
+
+	public Long getUnidadeSelecionada() {
+		return unidadeSelecionada;
+	}
+
+	public void setUnidadeSelecionada(Long unidadeSelecionada) {
+		this.unidadeSelecionada = unidadeSelecionada;
+	}
+
+	public boolean isGeraDATM() {
+		return geraDATM;
+	}
+
+	public void setGeraDATM(boolean geraDATM) {
+		this.geraDATM = geraDATM;
+	}
+
+	public String getZonaSelecionada() {
+		return zonaSelecionada;
+	}
+
+	public void setZonaSelecionada(String zonaSelecionada) {
+		this.zonaSelecionada = zonaSelecionada;
+	}
+
+	public List<Gestor> getGestores() {
+		return gestores;
+	}
+
+	public void setGestores(List<Gestor> gestores) {
+		this.gestores = gestores;
+	}
+
+	public Gestor getGestorPesquisado() {
+		return gestorPesquisado;
+	}
+
+	public void setGestorPesquisado(Gestor gestorPesquisado) {
+		this.gestorPesquisado = gestorPesquisado;
+	}
+
+	public String getGestorDescricaoPesquisada() {
+		return gestorDescricaoPesquisada;
+	}
+
+	public void setGestorDescricaoPesquisada(String gestorDescricaoPesquisada) {
+		this.gestorDescricaoPesquisada = gestorDescricaoPesquisada;
+	}
+	
+	public String getGestorPortariaNomeacao() {
+		return gestorPortariaNomeacao;
+	}
+	
+	public void setGestorPortariaNomeacao(String gestorPortariaNomeacao) {
+		this.gestorPortariaNomeacao = gestorPortariaNomeacao;
+	}
+
+	public boolean isRenderizar() {
+		return renderizar;
+	}
+
+	public void setRenderizar(boolean renderizar) {
+		this.renderizar = renderizar;
+	}
+
+	public Long getGestorID() {
+		return gestorID;
+	}
+
+	public void setGestorID(Long gestorID) {
+		this.gestorID = gestorID;
+	}
+
+	public Gestor getGestor() {
+		return gestor;
+	}
+
+	public void setGestor(Gestor gestor) {
+		this.gestor = gestor;
+	}
+
+	public Gestor getGestorSelecionado() {
+		return gestorSelecionado;
+	}
+
+	public void setGestorSelecionado(Gestor gestorSelecionado) {
+		this.gestorSelecionado = gestorSelecionado;
+	}
+
+	public boolean getExibir() {
+		return exibir;
+	}
+
+	public void setExibir(boolean exibir) {
+		this.exibir = exibir;
+	}
+	
+	
+
+}

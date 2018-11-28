@@ -1,0 +1,444 @@
+package br.gov.pi.teresina.semf.mb;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.PostConstruct;
+import javax.ejb.EJB;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+
+import org.primefaces.model.LazyDataModel;
+
+import br.gov.ejb.correios.transiente.EnderecoTransiente;
+import br.gov.pi.ejb.correios.bo.EnderecoBO;
+import br.gov.pi.ejb.correios.dao.EnderecoDAO;
+import br.gov.pi.teresina.semf.base.exception.RegraDeNegocioException;
+import br.gov.pi.teresina.semf.bo.PessoaFisicaBO;
+import br.gov.pi.teresina.semf.dao.util.ArgumentoVO;
+import br.gov.pi.teresina.semf.dao.util.CondicaoSQL;
+import br.gov.pi.teresina.semf.dao.util.Converte;
+import br.gov.pi.teresina.semf.dao.util.Mascara;
+import br.gov.pi.teresina.semf.dao.util.PremissaSQL;
+import br.gov.pi.teresina.semf.factory.OrgaoDAOFactory;
+import br.gov.pi.teresina.semf.jsf.util.ConsultaGenericaDataTable;
+import br.gov.pi.teresina.semf.mensagem.GerarMensagem;
+import br.gov.pi.teresina.semf.mensagem.MensagemRegraDeNegocio;
+import br.gov.pi.teresina.semf.modelo.Endereco;
+import br.gov.pi.teresina.semf.modelo.Municipio;
+import br.gov.pi.teresina.semf.modelo.PessoaFisica;
+import br.gov.pi.teresina.semf.modelo.Uf;
+import br.gov.pi.teresina.semf.service.GerarSelect;
+
+@ManagedBean
+@ViewScoped
+public class PessoaFisicaMB {
+	@EJB
+	private PessoaFisicaBO pessoaFisicaBO;
+	@EJB
+	private EnderecoDAO daoEndereco;
+	@EJB
+	private OrgaoDAOFactory factory;
+	@EJB
+	private EnderecoBO enderecoBO;
+	
+	private PessoaFisica pessoaFisica;
+	private PessoaFisica consultado;
+	private br.gov.pi.ejb.correios.dto.Endereco enderecoCorreios;
+	private Endereco endereco;
+	
+	private Long codigo;
+	private Long idUfResidencial;
+	private Long idMunicipioDefault;
+	private Long idPesquisa;
+	
+	private String cep;
+	private String dataNascimento;
+	private String nomeConsultado;
+	private String cpfConsultado;
+	private String logradouroConsulta;
+	
+	private boolean renderizar = true;
+	
+	private LazyDataModel<PessoaFisica> lista;
+	private List<Municipio> municipiosResidenciais = new ArrayList<Municipio>();
+	private List<Municipio> municipiosEleitorais = new ArrayList<Municipio>();
+	private List<PessoaFisica> listaPF;
+	private List<EnderecoTransiente> enderecos;
+	
+	
+
+	public PessoaFisicaMB() {
+		pessoaFisica = new PessoaFisica();
+		pessoaFisica.setEndereco(new Endereco());
+		endereco = new Endereco();
+		listaPF = new ArrayList<PessoaFisica>();
+	}
+
+	@PostConstruct
+	public void init() {
+		municipiosEleitorais = new GerarSelect<Municipio>(
+				factory.getMunicipioDAO()).getListItem("id", "descricao",
+				Municipio.class, new ArrayList<Municipio>());
+		municipiosResidenciais = new GerarSelect<Municipio>(
+				factory.getMunicipioDAO()).getListItem("id", "descricao",
+				Municipio.class, new ArrayList<Municipio>());
+		lista = new ConsultaGenericaDataTable<PessoaFisica>(lista, "nome",
+				null, factory.getPessoaFisicaDAO()).criarLazyDataModelVazio();
+	}
+
+	public void setDefaultValues() {
+		Uf ufResidencial = factory.getUfDAO().recuperarPorCampo("sigla", "PI");
+		idUfResidencial = ufResidencial.getId();
+		this.carregarListaMunicipiosResidenciais();
+		List<ArgumentoVO> args = new ArrayList<ArgumentoVO>();
+		args.add(new ArgumentoVO("uf.id", idUfResidencial, CondicaoSQL.IGUAL,
+				PremissaSQL.AND));
+		args.add(new ArgumentoVO("descricao", "TERESINA", CondicaoSQL.LIKE,
+				PremissaSQL.AND));
+		Municipio municipio = factory.getMunicipioDAO()
+				.recuperarPorCampos(args);
+		idMunicipioDefault = municipio.getId();
+	}
+
+	public void consultar() throws IOException {
+		System.out.println("cpfConsultado: " + cpfConsultado);
+		System.out.println("nomeConsultado: " + nomeConsultado);
+		List<ArgumentoVO> args = new ArrayList<ArgumentoVO>();
+		if (nomeConsultado != null && !nomeConsultado.trim().equals("")) {
+			args.add(new ArgumentoVO("nome", nomeConsultado.toUpperCase(),
+					CondicaoSQL.LIKE, PremissaSQL.AND));
+		}
+		if (cpfConsultado != null && !cpfConsultado.equals("")) {
+			args.add(new ArgumentoVO("documento", Mascara
+					.mascaraCPF(cpfConsultado), CondicaoSQL.IGUAL,
+					PremissaSQL.AND));
+		}
+		if (!args.isEmpty()) {
+			listaPF = pessoaFisicaBO.retornaPFPorArgumentos(args);
+		} else {
+			listaPF = pessoaFisicaBO.retornaTodos();
+		}
+	}
+
+	public void consultarPorCpf() {
+		if (cpfConsultado.trim().equals("")) {
+			GerarMensagem.mensagemErro("O CPF da pessoa deve ser informado.",
+					null);
+			return;
+		}
+		consultado = factory.getPessoaFisicaDAO().recuperarPorCampo("cpf",
+				cpfConsultado.trim().replace(".", "").replace("-", ""));
+		if (consultado == null || consultado.getId() == null) {
+			consultado = new PessoaFisica();
+			GerarMensagem.mensagemErro(
+					"Não existe pessoa física cadastrada com o cpf informado.",
+					null);
+		}
+	}
+
+	public void converterEndereco() {
+		try {
+			pessoaFisica.getEndereco().setBairro(
+					(enderecoCorreios.getBairros() != null && !enderecoCorreios
+							.getBairros().isEmpty()) ? enderecoCorreios
+							.getBairros().get(0) : "");
+			pessoaFisica.getEndereco().setLogradouro(
+					enderecoCorreios.getLogradouro());
+			Municipio municipio = factory.getMunicipioDAO().recuperarPorCampo(
+					"descricao",
+					enderecoCorreios.getMunicipio() != null ? enderecoCorreios
+							.getMunicipio().toUpperCase() : "");
+			pessoaFisica.getEndereco().setMunicipio(municipio);
+			pessoaFisica.getEndereco().setCep(enderecoCorreios.getCep());
+		} catch (NullPointerException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void consultarEnderecoPorCep() {
+		if (!pessoaFisica.getEndereco().getCep().trim().equals("")) {
+
+			br.gov.pi.ejb.correios.dto.Endereco endereco = EnderecoBO
+					.consultarEndereco(pessoaFisica.getEndereco().getCep(),
+							daoEndereco);
+			if (endereco != null) {
+				pessoaFisica.getEndereco().setLogradouro(
+						endereco.getLogradouro());
+				pessoaFisica.getEndereco().setBairro(
+						carregarListaBairros(endereco));
+				if (pessoaFisica.getId() == null) {
+					pessoaFisica.getEndereco()
+							.setNumero(endereco.getNumero());
+					pessoaFisica.getEndereco().setComplemento(
+							endereco.getComplemento());
+				}
+
+				Uf ufResidencial = factory.getUfDAO().recuperarPorCampo(
+						"sigla", endereco.getUf());
+
+				if (ufResidencial != null) {
+					idUfResidencial = ufResidencial.getId();
+
+					List<ArgumentoVO> args = new ArrayList<ArgumentoVO>();
+					args.add(new ArgumentoVO("descricao", endereco
+							.getMunicipio().toUpperCase(), CondicaoSQL.IGUAL,
+							PremissaSQL.AND));
+					args.add(new ArgumentoVO("uf.id", ufResidencial.getId(),
+							CondicaoSQL.IGUAL, PremissaSQL.AND));
+
+					Municipio municipio = factory.getMunicipioDAO()
+							.recuperarPorCampos(args);
+					if (municipio != null) {
+						pessoaFisica.getEndereco().getMunicipio()
+								.setId(municipio.getId());
+					}
+					carregarListaMunicipiosResidenciais();
+				}
+
+			}
+		}
+	}
+	
+	private String carregarListaBairros(
+			br.gov.pi.ejb.correios.dto.Endereco endereco) {
+		return endereco.getBairros().size() > 0 ? endereco.getBairros().get(0)
+				: endereco.getBairro();
+	}
+
+	public List<EnderecoTransiente> consultarEndereco() {
+		if (logradouroConsulta != null && !logradouroConsulta.isEmpty()) {
+
+			if (logradouroConsulta.length() <= 3) {
+				GerarMensagem.mensagemAlerta(
+						"O campo Logradouro deve ter mais de 3 caracteres.",
+						null);
+			} else {
+				enderecos = enderecoBO.consultarEnderecoPopup(pessoaFisica
+						.getEndereco().getMunicipio().getDescricao(),
+						pessoaFisica.getEndereco().getMunicipio().getUf()
+								.getSigla(), logradouroConsulta);
+			}
+
+		} else {
+			GerarMensagem.mensagemErro("O Logradouro é obrigatório!", null);
+		}
+		return enderecos;
+	}
+
+	public void setarEnderecoPagina() {
+		EnderecoTransiente end = new EnderecoTransiente();
+		if (idPesquisa != null) {
+			for (EnderecoTransiente et : enderecos) {
+				if (et.getId() == idPesquisa) {
+					end = et;
+					break;
+				}
+			}
+			pessoaFisica.getEndereco().setCep(end.getCep());
+			pessoaFisica.getEndereco().setLogradouro(end.getLogradouro());
+			pessoaFisica.getEndereco().setBairro(end.getBairro());
+		}
+	}
+	
+	public void carregarListaMunicipiosResidenciais() {
+		ArgumentoVO arg = new ArgumentoVO("uf.id", idUfResidencial,
+				CondicaoSQL.IGUAL, PremissaSQL.VAZIO);
+		municipiosResidenciais = new GerarSelect<Municipio>(
+				factory.getMunicipioDAO()).getListItemComRestricao(
+				Municipio.class, arg);
+	}
+	
+	public void limparCampos() {
+		cpfConsultado = "";
+		nomeConsultado = "";
+	}
+
+	public void salvar() {
+		try {
+			pessoaFisica = pessoaFisicaBO.salvar(dataNascimento, pessoaFisica);
+			renderizar = true;
+			GerarMensagem.mensagemSucesso(
+					MensagemRegraDeNegocio.OPERACAO_SUCESSO, null);
+		} catch (RegraDeNegocioException e) {
+			GerarMensagem.mensagensErro(e.getMessage());
+		} catch (Exception e) {
+			e.printStackTrace();
+			GerarMensagem.mensagemErro(
+					MensagemRegraDeNegocio.CONTACTAR_ADMINISTRADOR, null);
+		}
+	}
+
+	public void editar() {
+		if (renderizar && codigo != null) {
+			pessoaFisica = factory.getPessoaFisicaDAO().recuperarPorId(codigo);
+			if (pessoaFisica != null
+					&& pessoaFisica.getDataNascimento() != null) {
+				dataNascimento = Converte.dateToStr(pessoaFisica
+						.getDataNascimento().getTime());
+			}
+			if (pessoaFisica != null && pessoaFisica.getEndereco() != null
+					&& pessoaFisica.getEndereco().getMunicipio() != null) {
+				idUfResidencial = pessoaFisica.getEndereco().getMunicipio()
+						.getUf().getId();
+				carregarListaMunicipiosResidenciais();
+			}
+			renderizar = false;
+		}
+	}
+
+	public void setPessoaFisica(PessoaFisica pessoaFisica) {
+		this.pessoaFisica = pessoaFisica;
+	}
+
+	public String getDataNascimento() {
+		return dataNascimento;
+	}
+
+	public void setDataNascimento(String dataNascimento) {
+		this.dataNascimento = dataNascimento;
+	}
+
+	public PessoaFisica getPessoaFisica() {
+		return pessoaFisica;
+	}
+
+	public List<Municipio> getMunicipiosResidenciais() {
+		return municipiosResidenciais;
+	}
+
+	public void setMunicipiosResidenciais(List<Municipio> municipiosResidenciais) {
+		this.municipiosResidenciais = municipiosResidenciais;
+	}
+
+	public List<Municipio> getMunicipiosEleitorais() {
+		return municipiosEleitorais;
+	}
+
+	public void setMunicipiosEleitorais(List<Municipio> municipiosEleitorais) {
+		this.municipiosEleitorais = municipiosEleitorais;
+	}
+
+	public Long getCodigo() {
+		return codigo;
+	}
+
+	public void setCodigo(Long codigo) {
+		this.codigo = codigo;
+	}
+
+	public Long getIdUfResidencial() {
+		return idUfResidencial;
+	}
+
+	public void setIdUfResidencial(Long idUfResidencial) {
+		this.idUfResidencial = idUfResidencial;
+	}
+
+	public LazyDataModel<PessoaFisica> getLista() {
+		return lista;
+	}
+
+	public void setLista(LazyDataModel<PessoaFisica> lista) {
+		this.lista = lista;
+	}
+
+	public String getNomeConsultado() {
+		return nomeConsultado;
+	}
+
+	public void setNomeConsultado(String nomeConsultado) {
+		this.nomeConsultado = nomeConsultado;
+	}
+
+	public String getCpfConsultado() {
+		return cpfConsultado;
+	}
+
+	public void setCpfConsultado(String cpfConsultado) {
+		this.cpfConsultado = cpfConsultado;
+	}
+
+	public PessoaFisica getConsultado() {
+		return consultado;
+	}
+
+	public void setConsultado(PessoaFisica consultado) {
+		this.consultado = consultado;
+	}
+
+	public Endereco getEndereco() {
+		return endereco;
+	}
+
+	public void setEndereco(Endereco endereco) {
+		this.endereco = endereco;
+	}
+
+	public Long getIdMunicipioDefault() {
+		return idMunicipioDefault;
+	}
+
+	public void setIdMunicipioDefault(Long idMunicipioDefault) {
+		this.idMunicipioDefault = idMunicipioDefault;
+	}
+
+	public List<PessoaFisica> getListaPF() {
+		return listaPF;
+	}
+
+	public void setListaPF(List<PessoaFisica> listaPF) {
+		this.listaPF = listaPF;
+	}
+
+	public String getCep() {
+		return cep;
+	}
+
+	public void setCep(String cep) {
+		this.cep = cep;
+	}
+
+	public EnderecoBO getEnderecoBO() {
+		return enderecoBO;
+	}
+
+	public void setEnderecoBO(EnderecoBO enderecoBO) {
+		this.enderecoBO = enderecoBO;
+	}
+
+	public br.gov.pi.ejb.correios.dto.Endereco getEnderecoCorreios() {
+		return enderecoCorreios;
+	}
+
+	public void setEnderecoCorreios(
+			br.gov.pi.ejb.correios.dto.Endereco enderecoCorreios) {
+		this.enderecoCorreios = enderecoCorreios;
+	}
+
+	public Long getIdPesquisa() {
+		return idPesquisa;
+	}
+
+	public void setIdPesquisa(Long idPesquisa) {
+		this.idPesquisa = idPesquisa;
+	}
+
+	public String getLogradouroConsulta() {
+		return logradouroConsulta;
+	}
+
+	public void setLogradouroConsulta(String logradouroConsulta) {
+		this.logradouroConsulta = logradouroConsulta;
+	}
+
+	public List<EnderecoTransiente> getEnderecos() {
+		return enderecos;
+	}
+
+	public void setEnderecos(List<EnderecoTransiente> enderecos) {
+		this.enderecos = enderecos;
+	}
+	
+}

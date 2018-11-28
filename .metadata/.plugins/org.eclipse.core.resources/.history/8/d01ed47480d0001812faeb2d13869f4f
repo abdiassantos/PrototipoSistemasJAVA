@@ -1,0 +1,320 @@
+package br.gov.pi.teresina.semf.mb;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.PostConstruct;
+import javax.ejb.EJB;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+
+import org.primefaces.model.LazyDataModel;
+
+import br.gov.ejb.correios.transiente.EnderecoTransiente;
+import br.gov.pi.ejb.correios.bo.EnderecoBO;
+import br.gov.pi.ejb.correios.dao.EnderecoDAO;
+import br.gov.pi.teresina.semf.base.exception.RegraDeNegocioException;
+import br.gov.pi.teresina.semf.bo.PessoaFisicaBO;
+import br.gov.pi.teresina.semf.bo.RedesSociaisBO;
+import br.gov.pi.teresina.semf.factory.OrgaoDAOFactory;
+import br.gov.pi.teresina.semf.jsf.util.ConsultaGenericaDataTable;
+import br.gov.pi.teresina.semf.mensagem.GerarMensagem;
+import br.gov.pi.teresina.semf.mensagem.MensagemRegraDeNegocio;
+import br.gov.pi.teresina.semf.modelo.Endereco;
+import br.gov.pi.teresina.semf.modelo.Municipio;
+import br.gov.pi.teresina.semf.modelo.PessoaFisica;
+import br.gov.pi.teresina.semf.modelo.RedesSociais;
+
+@ManagedBean
+@ViewScoped
+public class RedesSociaisMB {
+	@EJB
+	private PessoaFisicaBO pessoaFisicaBO;
+	@EJB
+	private EnderecoDAO daoEndereco;
+	@EJB
+	private OrgaoDAOFactory factory;
+	@EJB
+	private EnderecoBO enderecoBO;
+	@EJB
+	private RedesSociaisBO redesSociaisBO;
+	
+	private RedesSociais redesSociais;	
+	private PessoaFisica pessoaFisica;
+	private PessoaFisica consultado;
+	private br.gov.pi.ejb.correios.dto.Endereco enderecoCorreios;
+	private Endereco endereco;
+	
+	private Long codigo;
+	private Long idUfResidencial;
+	private Long idMunicipioDefault;
+	private Long idPesquisa;
+	
+	private String cep;
+	private String dataNascimento;
+	private String nomeConsultado;
+	private String cpfConsultado;
+	private String logradouroConsulta;
+	
+	private boolean renderizar = true;
+	
+	private List<RedesSociais> listaRedesSociais;
+	private List<RedesSociais> lista;
+	private List<Municipio> municipiosResidenciais = new ArrayList<Municipio>();
+	private List<Municipio> municipiosEleitorais = new ArrayList<Municipio>();
+	private List<PessoaFisica> listaPF;
+	private List<EnderecoTransiente> enderecos;
+	
+	
+
+	public RedesSociaisMB() {
+		pessoaFisica = new PessoaFisica();
+		pessoaFisica.setEndereco(new Endereco());
+		endereco = new Endereco();
+		listaPF = new ArrayList<PessoaFisica>();
+		listaRedesSociais = new ArrayList<RedesSociais>();
+		redesSociais = new RedesSociais();
+	}
+	
+	@PostConstruct
+	public void init(){
+		lista = new RedesSociaisBO().retornaTodos();
+	}
+	
+	public void salvar() {
+		try {
+			if(redesSociais.getDescricao() == null || redesSociais.getDescricao().equals("")){
+				GerarMensagem.mensagemErro(MensagemRegraDeNegocio.CAMPO_ALGUM_OBRIGATORIO, null);
+			}else{
+			redesSociais = redesSociaisBO.salvar(redesSociais);
+			renderizar = true;
+			GerarMensagem.mensagemSucesso(
+					MensagemRegraDeNegocio.OPERACAO_SUCESSO, null);
+			}
+		} catch (RegraDeNegocioException e) {
+			GerarMensagem.mensagensErro(e.getMessage());
+		} catch (Exception e) {
+			e.printStackTrace();
+			GerarMensagem.mensagemErro(
+					MensagemRegraDeNegocio.CONTACTAR_ADMINISTRADOR, null);
+		}
+	}
+	
+	public void editar() {
+		if (renderizar && codigo != null) {
+			redesSociais = factory.getRedesSociaisDAO().recuperarPorId(codigo);
+			}
+			renderizar = false;
+		}
+	
+
+	public PessoaFisicaBO getPessoaFisicaBO() {
+		return pessoaFisicaBO;
+	}
+
+	public void setPessoaFisicaBO(PessoaFisicaBO pessoaFisicaBO) {
+		this.pessoaFisicaBO = pessoaFisicaBO;
+	}
+
+	public EnderecoDAO getDaoEndereco() {
+		return daoEndereco;
+	}
+
+	public void setDaoEndereco(EnderecoDAO daoEndereco) {
+		this.daoEndereco = daoEndereco;
+	}
+
+	public OrgaoDAOFactory getFactory() {
+		return factory;
+	}
+
+	public void setFactory(OrgaoDAOFactory factory) {
+		this.factory = factory;
+	}
+
+	public EnderecoBO getEnderecoBO() {
+		return enderecoBO;
+	}
+
+	public void setEnderecoBO(EnderecoBO enderecoBO) {
+		this.enderecoBO = enderecoBO;
+	}
+
+	public RedesSociais getRedesSociais() {
+		return redesSociais;
+	}
+
+	public void setRedesSociais(RedesSociais redesSociais) {
+		this.redesSociais = redesSociais;
+	}
+
+	public PessoaFisica getPessoaFisica() {
+		return pessoaFisica;
+	}
+
+	public void setPessoaFisica(PessoaFisica pessoaFisica) {
+		this.pessoaFisica = pessoaFisica;
+	}
+
+	public PessoaFisica getConsultado() {
+		return consultado;
+	}
+
+	public void setConsultado(PessoaFisica consultado) {
+		this.consultado = consultado;
+	}
+
+	public br.gov.pi.ejb.correios.dto.Endereco getEnderecoCorreios() {
+		return enderecoCorreios;
+	}
+
+	public void setEnderecoCorreios(br.gov.pi.ejb.correios.dto.Endereco enderecoCorreios) {
+		this.enderecoCorreios = enderecoCorreios;
+	}
+
+	public Endereco getEndereco() {
+		return endereco;
+	}
+
+	public void setEndereco(Endereco endereco) {
+		this.endereco = endereco;
+	}
+
+	public Long getCodigo() {
+		return codigo;
+	}
+
+	public void setCodigo(Long codigo) {
+		this.codigo = codigo;
+	}
+
+	public Long getIdUfResidencial() {
+		return idUfResidencial;
+	}
+
+	public void setIdUfResidencial(Long idUfResidencial) {
+		this.idUfResidencial = idUfResidencial;
+	}
+
+	public Long getIdMunicipioDefault() {
+		return idMunicipioDefault;
+	}
+
+	public void setIdMunicipioDefault(Long idMunicipioDefault) {
+		this.idMunicipioDefault = idMunicipioDefault;
+	}
+
+	public Long getIdPesquisa() {
+		return idPesquisa;
+	}
+
+	public void setIdPesquisa(Long idPesquisa) {
+		this.idPesquisa = idPesquisa;
+	}
+
+	public String getCep() {
+		return cep;
+	}
+
+	public void setCep(String cep) {
+		this.cep = cep;
+	}
+
+	public String getDataNascimento() {
+		return dataNascimento;
+	}
+
+	public void setDataNascimento(String dataNascimento) {
+		this.dataNascimento = dataNascimento;
+	}
+
+	public String getNomeConsultado() {
+		return nomeConsultado;
+	}
+
+	public void setNomeConsultado(String nomeConsultado) {
+		this.nomeConsultado = nomeConsultado;
+	}
+
+	public String getCpfConsultado() {
+		return cpfConsultado;
+	}
+
+	public void setCpfConsultado(String cpfConsultado) {
+		this.cpfConsultado = cpfConsultado;
+	}
+
+	public String getLogradouroConsulta() {
+		return logradouroConsulta;
+	}
+
+	public void setLogradouroConsulta(String logradouroConsulta) {
+		this.logradouroConsulta = logradouroConsulta;
+	}
+
+	public boolean isRenderizar() {
+		return renderizar;
+	}
+
+	public void setRenderizar(boolean renderizar) {
+		this.renderizar = renderizar;
+	}
+
+	public List<RedesSociais> getListaRedesSociais() {
+		return listaRedesSociais;
+	}
+
+	public void setListaRedesSociais(List<RedesSociais> listaRedesSociais) {
+		this.listaRedesSociais = listaRedesSociais;
+	}
+
+	public LazyDataModel<RedesSociais> getLista() {
+		return lista;
+	}
+
+	public void setLista(LazyDataModel<RedesSociais> lista) {
+		this.lista = lista;
+	}
+
+	public List<Municipio> getMunicipiosResidenciais() {
+		return municipiosResidenciais;
+	}
+
+	public void setMunicipiosResidenciais(List<Municipio> municipiosResidenciais) {
+		this.municipiosResidenciais = municipiosResidenciais;
+	}
+
+	public List<Municipio> getMunicipiosEleitorais() {
+		return municipiosEleitorais;
+	}
+
+	public void setMunicipiosEleitorais(List<Municipio> municipiosEleitorais) {
+		this.municipiosEleitorais = municipiosEleitorais;
+	}
+
+	public List<PessoaFisica> getListaPF() {
+		return listaPF;
+	}
+
+	public void setListaPF(List<PessoaFisica> listaPF) {
+		this.listaPF = listaPF;
+	}
+
+	public List<EnderecoTransiente> getEnderecos() {
+		return enderecos;
+	}
+
+	public void setEnderecos(List<EnderecoTransiente> enderecos) {
+		this.enderecos = enderecos;
+	}
+
+	public RedesSociaisBO getRedesSociaisBO() {
+		return redesSociaisBO;
+	}
+
+	public void setRedesSociaisBO(RedesSociaisBO redesSociaisBO) {
+		this.redesSociaisBO = redesSociaisBO;
+	}
+	
+	
+}

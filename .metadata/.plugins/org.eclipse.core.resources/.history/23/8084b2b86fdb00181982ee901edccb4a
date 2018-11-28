@@ -1,0 +1,103 @@
+package br.gov.pi.teresina.semf.bo;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.ejb.EJB;
+import javax.ejb.Stateless;
+
+import br.gov.pi.teresina.semf.base.exception.RegraDeNegocioException;
+import br.gov.pi.teresina.semf.dao.GestorDAO;
+import br.gov.pi.teresina.semf.dao.util.ArgumentoVO;
+import br.gov.pi.teresina.semf.dao.util.CondicaoSQL;
+import br.gov.pi.teresina.semf.dao.util.Mascara;
+import br.gov.pi.teresina.semf.dao.util.PremissaSQL;
+import br.gov.pi.teresina.semf.mensagem.Mensagem;
+import br.gov.pi.teresina.semf.modelo.Gestor;
+
+@Stateless
+public class GestorBO {
+	
+	@EJB
+	GestorDAO gestorDAO;
+	
+	public Gestor salvar(Gestor gestor) throws RegraDeNegocioException {
+		validar(gestor);
+		gestor.setNomeRazao(Mascara.removeAcentos(gestor.getNomeRazao().toUpperCase()));
+		
+		return gestorDAO.salvar(gestor);
+	}
+	
+	public void validar(Gestor gestor) throws RegraDeNegocioException {
+		StringBuffer mensagem = new StringBuffer();
+		
+		System.getProperty("line.separator");
+		
+		if (gestor.getUnidade() == null) {
+			mensagem.append("O campo Unidade " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		if (gestor.getOrgao() == null) {
+			mensagem.append("O campo Orgão " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		if (gestor.getCpf().trim().equals("")) {
+			mensagem.append("O campo CPF " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		if (gestor.getNomeRazao().trim().equals("")) {
+			mensagem.append("O campo Nome " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		if (gestor.getEmail().trim().equals("")) {
+			mensagem.append("O campo Email " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		if (gestor.getCelularPrincipal().trim().equals("")) {
+			mensagem.append("O campo Celular Principal " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		if (gestor.getMandato() == null) {
+			mensagem.append("O campo Mandato " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		if (gestor.getNumeroPortariaNomeacao() == null) {
+			mensagem.append("O campo Número Portaria Nomeação " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		if (gestor.getDataPortariaNomeacao() == null) {
+			mensagem.append("O campo Data Portaria Nomeação " + Mensagem.CAMPO_OBRIGATORIO
+					+ ";" + System.lineSeparator());
+		}
+		
+		if (mensagem.length() > 0) {
+			throw new RegraDeNegocioException(mensagem.toString());
+		}
+	}
+	
+	public Gestor recuperarPorId(Long gestorID) {
+		return gestorDAO.recuperarPorId(gestorID);
+	}
+
+	public List<Gestor> recuperarTodos() {
+		return gestorDAO.recuperarTodos("nomeRazao", "asc");
+	}
+
+	public List<Gestor> recuperarGestorPorCamposDialog(String gestorDescricaoPesquisada) {
+		return gestorDAO.recuperarGestorPorCamposDialog(gestorDescricaoPesquisada);
+	}
+
+	public List<Gestor> recuperarGestorPorNome(String gestorDescricaoPesquisada) {
+		List<ArgumentoVO> args = new ArrayList<ArgumentoVO>();
+		args.add(new ArgumentoVO("nomerazao", gestorDescricaoPesquisada, CondicaoSQL.LIKE, PremissaSQL.AND));
+		return gestorDAO.recuperarListaPorCampos(args);
+	}
+
+	public List<Gestor> retornaGestorPorArgumentos(List<ArgumentoVO> args) {
+		return gestorDAO.recuperarListaPorCampos(args, "nomeRazao", "asc");
+	}
+
+	public List<Gestor> retornaTodos() {
+		return gestorDAO.recuperarTodos("nomeRazao", "asc");
+	}
+}

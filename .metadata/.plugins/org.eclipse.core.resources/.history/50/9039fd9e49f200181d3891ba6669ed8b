@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-br"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui">
+<f:view>
+	<h:head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+		<meta http-equiv="cache-control" content="no-cache" />
+		<meta http-equiv="pragma" content="no-cache" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="description" content="Cadastro de Julgamentos" />
+		<meta name="keywords" content="secretaria de finanças de teresina, Cadastro de Julgamentos." />    
+		<link rel="author" type="text/plain" href="humans.txt" />
+		
+		<title><ui:insert name="title">Serviços Municipais de Teresina</ui:insert></title>
+		
+		<link rel="shortcut icon" href="#{request.contextPath}/img/icons/favicon.ico" />
+		<link rel="apple-touch-icon-precomposed" href="#{request.contextPath}/img/icons/touch-icon-iphone.png" />
+		<link rel="apple-touch-icon-precomposed" href="#{request.contextPath}/img/icons/touch-icon-ipad.png" />
+		<link rel="apple-touch-icon-precomposed" href="#{request.contextPath}/img/icons/touch-icon-iphone4.png" />
+		<link rel="apple-touch-icon-precomposed" href="#{request.contextPath}/img/icons/touch-icon-ipad3.png" />
+		
+		<link href="#{request.contextPath}/css/bootstrap.css" rel="stylesheet" />
+		<link href="#{request.contextPath}/css/bootstrap-responsive.css" rel="stylesheet" />
+		<link href="#{request.contextPath}/css/font-awesome.min.css" rel="stylesheet" />
+		<link href="#{request.contextPath}/css/docs.css" rel="stylesheet" />
+		<link href="dist/css/bootstrap-submenu.min.css" rel="stylesheet" />
+	</h:head>
+	<h:body>
+		<ui:insert name="loading">
+			<ui:include src="/jsf/Template/loading.xhtml" />	
+		</ui:insert>
+	
+		<header>
+			<div class="container">
+				<ui:insert name="topo">
+					<ui:include src="/jsf/Template/topo.xhtml" />
+				</ui:insert>
+			</div>
+		</header>
+	
+		<ui:insert name="corpo">
+		
+		</ui:insert>
+		
+		<footer>
+			<div class="container">
+				<ui:insert name="rodape">
+					<ui:include src="/jsf/Template/rodape.xhtml" />
+				</ui:insert>
+			</div>
+		</footer>
+		<script src="#{request.contextPath}/js/bootstrap.min.js"></script>
+		<script type="text/javascript">
+			$(document).ready(function() {
+	            $("input[id*='calendario']").mask('99/99/9999');
+	        });
+
+			function start() {
+				PF('statusDialog').show();
+			}
+	
+			function stop() {
+				PF('statusDialog').hide();
+			}
+		
+			PrimeFaces.locales['pt_BR'] = {
+				closeText : 'Fechar',
+				prevText : 'Anterior',
+				nextText : 'Próximo',
+				currentText : 'Começo',
+				monthNames : [ 'Janeiro', 'Fevereiro', 'Março', 'Abril',
+						'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro',
+						'Outubro', 'Novembro', 'Dezembro' ],
+				monthNamesShort : [ 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+						'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez' ],
+				dayNames : [ 'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta',
+						'Sexta', 'Sábado' ],
+				dayNamesShort : [ 'Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex',
+						'Sáb' ],
+				dayNamesMin : [ 'D', 'S', 'T', 'Q', 'Q', 'S', 'S' ],
+				weekHeader : 'Semana',
+				firstDay : 0,
+				isRTL : false,
+				showMonthAfterYear : false,
+				yearSuffix : '',
+				timeOnlyTitle : 'Só Horas',
+				timeText : 'Tempo',
+				hourText : 'Hora',
+				minuteText : 'Minuto',
+				secondText : 'Segundo',
+				currentText : 'Data Atual',
+				ampm : false,
+				month : 'Mês',
+				week : 'Semana',
+				day : 'Dia',
+				allDayText : 'Todo Dia'
+			};
+		</script>
+	</h:body>
+</f:view>
+
+</html>
